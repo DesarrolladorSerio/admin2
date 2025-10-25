@@ -1,17 +1,44 @@
-# Imagen base específica (no latest)
-FROM node:20.11.1-alpine3.19
+# ======== Etapa de construcción ========
+FROM node:20.11.1-alpine3.19 AS builder
+
+LABEL maintainer="Augusto Fuenzalida" \
+      version="1.0" \
+      description="Frontend React + Vite + Tailwind para Proyecto Redes 2025-II"
 
 WORKDIR /app
 
-# Instalación de dependencias
+# Crear usuario no root
+RUN adduser -D appuser
+
+# Copiar e instalar dependencias
 COPY package.json package-lock.json* ./
 RUN npm install
 
-# Copia del código
+# Copiar el resto del código y construir
 COPY . .
+RUN npm run build
 
-# Exponer puerto de Vite
-EXPOSE 5173
+# ======== Etapa de despliegue ========
+FROM nginx:1.25.5-alpine
 
-# Comando por defecto: modo dev con host abierto
-CMD ["npm", "run", "dev", "--", "--host"]
+LABEL maintainer="Augusto Fuenzalida" \
+      version="1.0" \
+      description="Frontend compilado servido con Nginx"
+
+# Crear y dar permisos a directorios usados por Nginx
+RUN mkdir -p /var/cache/nginx /var/run /var/log/nginx && \
+    touch /var/run/nginx.pid && \
+    chown -R nginx:nginx /var/cache/nginx /var/run /var/log/nginx /var/run/nginx.pid
+
+# Copiar los archivos compilados
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+# Cambiar a usuario no root (seguro)
+USER nginx
+
+# Iniciar nginx
+CMD ["nginx", "-g", "daemon off;"]
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://localhost:80 || exit 1

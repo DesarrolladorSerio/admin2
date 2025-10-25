@@ -1,6 +1,9 @@
 version: "3.9"
 
 services:
+  # ========================
+  # 🗄️ Base de datos PostgreSQL
+  # ========================
   db:
     image: postgres:16.4
     container_name: proyecto_db
@@ -17,10 +20,17 @@ services:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
     networks:
-      - app_net
+      database_net:
+        aliases:
+          - proyecto_db
 
+  # ========================
+  # ⚙️ Backend (FastAPI)
+  # ========================
   backend:
     build:
       context: ./services/servicio-1
@@ -28,16 +38,37 @@ services:
     container_name: proyecto_backend
     env_file:
       - .env
+    environment:
+      # IMPORTANTE: Usa ${} (no $${}) para que Compose interpole desde .env
+      DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
     ports:
       - "${BACKEND_PORT}:8000"
-    environment:
-      DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}"
-    depends_on: 
+    depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      # Asegúrate de tener /health en tu FastAPI
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
     networks:
-      - app_net
+      backend_net:
+        aliases:
+          - backend
+          - proyecto_backend
+      database_net:
 
+  # ========================
+  # 💻 Frontend (Nginx sirviendo build de Vite)
+  # ========================
   frontend:
     build:
       context: ./services/frontend
@@ -45,29 +76,59 @@ services:
     container_name: proyecto_frontend
     env_file:
       - .env
+    # Nginx dentro del contenedor escucha en 80 → exponemos 5173:80
     ports:
-      - "${FRONTEND_PORT}:5173"
-    depends_on:
-      - backend
+      - "${FRONTEND_PORT}:80"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.30"
+          memory: 256M
     networks:
-      - app_net
+      frontend_net:
+        aliases:
+          - frontend
+          - proyecto_frontend
 
+  # ========================
+  # 🌐 API Gateway (Nginx)
+  # ========================
   gateway:
     build:
       context: ./services/api-gateway
-      dockerfile: Dockerfile
     container_name: proyecto_gateway
     ports:
       - "${GATEWAY_PORT}:80"
     depends_on:
-      - frontend
-      - backend
+      frontend:
+        condition: service_started
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.30"
+          memory: 128M
     networks:
-      - app_net
+      frontend_net:
+      backend_net:
 
+# ========================
+# Volúmenes persistentes
+# ========================
 volumes:
   db_data:
+  backup_data:
 
+# ========================
+# Redes separadas (aislamiento)
+# ========================
 networks:
-  app_net:
+  frontend_net:
+    driver: bridge
+  backend_net:
+    driver: bridge
+  database_net:
     driver: bridge
