@@ -1,52 +1,93 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine, text
-from sqlalchemy.exc import OperationalError
-import os, time
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from datetime import datetime, timedelta
+from pydantic import BaseModel
+import os
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg://app:app@db:5432/contador")
-engine = create_engine(DATABASE_URL, echo=True)
+# =============================================================================
+# CONFIGURACIÓN
+# =============================================================================
 
-app = FastAPI(title="Contador API")
+DATABASE_URL = os.getenv("DATABASE_URL")
+SECRET_KEY = "un-secreto-muy-fuerte-y-largo"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # abierto para pruebas
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
+app = FastAPI()
+
+# =============================================================================
+# MODELOS DE DATOS (Pydantic)
+# =============================================================================
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+# =============================================================================
+# LÓGICA DE AUTENTICACIÓN
+# =============================================================================
+
+fake_users_db = {
+    "admin@municipalidad.cl": {
+        "username": "admin@municipalidad.cl",
+        "hashed_password": pwd_context.hash("admin123"),
+    }
+}
+
+def get_user(db, username: str):
+    """Busca un usuario en nuestra base de datos falsa."""
+    if username in db:
+        return db[username]
+    return None
+
+def authenticate_user(db, username: str, password: str):
+    """Autentica un usuario verificando su contraseña."""
+    user = get_user(db, username)
+    if not user:
+        return False
+    if not pwd_context.verify(password, user["hashed_password"]):
+        return False
+    return user
+
+def create_access_token(data: dict, expires_delta: timedelta | None = None):
+    """Crea un nuevo token de acceso."""
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+
+# ENDPOINTS DE LA API
+
+
+@app.post("/token")
+async def login_for_access_token(login_data: LoginRequest):
+    user = authenticate_user(fake_users_db, login_data.username, login_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user["username"]}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
 @app.get("/health")
-def health():
+def health_check():
+    """Endpoint de salud para Docker."""
     return {"status": "ok"}
 
-def wait_for_db():
-    import traceback
-    for i in range(30):  # más paciencia
-        try:
-            with engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
-                print("✅ DB disponible")
-                return
-        except Exception as e:
-            print(f"⏳ Esperando DB... intento {i+1}/30")
-            traceback.print_exc()
-            time.sleep(3)
-    raise Exception("❌ No se pudo conectar a la base de datos")
-
-
-wait_for_db()
-
-@app.get("/contador")
-def get_contador():
-    with engine.connect() as conn:
-        result = conn.execute(text("SELECT valor FROM contador WHERE id=1")).scalar()
-        return {"valor": result}
-
-@app.post("/incrementar")
-def incrementar():
-    with engine.begin() as conn:
-        conn.execute(text("UPDATE contador SET valor = valor + 1 WHERE id=1"))
-        result = conn.execute(text("SELECT valor FROM contador WHERE id=1")).scalar()
-        return {"valor": result}

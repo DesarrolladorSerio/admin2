@@ -1,4 +1,7 @@
-fastapi==0.114.2
-uvicorn[standard]==0.30.6
-psycopg[binary]==3.2.3
-sqlalchemy==2.0.35
+fastapi
+uvicorn[standard]
+psycopg2-binary
+passlib[bcrypt]
+bcrypt==3.2.0
+python-jose[cryptography]
+python-multipart

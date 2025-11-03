@@ -2,8 +2,8 @@
 FROM python:3.11.9-slim AS builder
 
 LABEL maintainer="Augusto Fuenzalida" \
-      version="1.0" \
-      description="Backend FastAPI del Proyecto Redes 2025-II"
+    version="1.0" \
+    description="Backend FastAPI del Proyecto Redes 2025-II"
 
 # Crear usuario no root
 RUN adduser --disabled-password appuser
