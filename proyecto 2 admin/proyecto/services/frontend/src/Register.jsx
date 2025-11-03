@@ -2,12 +2,11 @@ import React, { useState } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
 
-const Login = () => {
+const Register = () => {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [err, setErr] = useState("");
     const [success, setSuccess] = useState("");
-
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -15,21 +14,26 @@ const Login = () => {
         setSuccess("");
 
         try {
-            // Enviar datos como JSON - mucho más simple y entendible
-            const response = await axios.post("/api/token", {
+            const response = await axios.post("/api/register", {
                 username: username,
                 password: password
             });
 
-            setSuccess("Login successful");
-            console.log("Token:", response.data.access_token);
+            setSuccess("✅ Usuario registrado exitosamente! Token: " + response.data.access_token.substring(0, 20) + "...");
+            console.log("Token completo:", response.data.access_token);
+
+            // Limpiar formulario después de registro exitoso
+            setUsername("");
+            setPassword("");
 
         } catch (error) {
-            setErr("Login failed: " + (error.response?.data?.detail || error.message));
+            setErr("Registration failed: " + (error.response?.data?.detail || error.message));
         }
-    }; return (
+    };
+
+    return (
         <div style={{ padding: "20px", maxWidth: "400px", margin: "0 auto" }}>
-            <h2>Login</h2>
+            <h2>Register</h2>
             <form onSubmit={handleSubmit}>
                 <div style={{ marginBottom: "10px" }}>
                     <input
@@ -53,18 +57,18 @@ const Login = () => {
                 </div>
                 <button
                     type="submit"
-                    style={{ width: "100%", padding: "10px", backgroundColor: "#007bff", color: "white", border: "none" }}
+                    style={{ width: "100%", padding: "10px", backgroundColor: "#28a745", color: "white", border: "none" }}
                 >
-                    Login
+                    Register
                 </button>
             </form>
             {success && <p style={{ color: "green" }}>{success}</p>}
             {err && <p style={{ color: "red" }}>{err}</p>}
             <p style={{ marginTop: "10px" }}>
-                Don't have an account? <Link to="/register">Register</Link>
+                Already have an account? <Link to="/login">Login</Link>
             </p>
         </div>
     );
 };
 
-export default Login;
+export default Register;
