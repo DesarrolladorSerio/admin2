@@ -30,6 +30,9 @@ RUN mkdir -p /var/cache/nginx /var/run /var/log/nginx && \
     touch /var/run/nginx.pid && \
     chown -R nginx:nginx /var/cache/nginx /var/run /var/log/nginx /var/run/nginx.pid
 
+# Copiar configuración de Nginx
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
 # Copiar los archivos compilados
 COPY --from=builder /app/dist /usr/share/nginx/html
 
