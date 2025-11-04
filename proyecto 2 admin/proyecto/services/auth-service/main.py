@@ -97,7 +97,7 @@ def register_user(
     session: Session = Depends(get_session)
 ):
     """Registra un nuevo usuario."""
-    from db import get_user_by_username, create_user
+    from db_auth import get_user_by_username, create_user
     
     # Verificar si el usuario ya existe
     existing_user = get_user_by_username(session, user_data.username)

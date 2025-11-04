@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const Login = () => {
     const [username, setUsername] = useState("");
@@ -8,6 +8,8 @@ const Login = () => {
     const [err, setErr] = useState("");
     const [success, setSuccess] = useState("");
 
+
+    const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -21,13 +23,18 @@ const Login = () => {
                 password: password
             });
 
+            // Guardar username localmente y redirigir al menú
+            localStorage.setItem('username', username);
             setSuccess("Login successful");
             console.log("Token:", response.data.access_token);
+            navigate('/menu');
 
         } catch (error) {
             setErr("Login failed: " + (error.response?.data?.detail || error.message));
         }
-    }; return (
+    };
+
+    return (
         <div style={{ padding: "20px", maxWidth: "400px", margin: "0 auto" }}>
             <h2>Login</h2>
             <form onSubmit={handleSubmit}>
