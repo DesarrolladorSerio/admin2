@@ -17,8 +17,8 @@ const Login = () => {
         setSuccess("");
 
         try {
-            // Enviar datos como JSON - mucho más simple y entendible
-            const response = await axios.post("/api/token", {
+            // Enviar datos como JSON directamente al servicio de autenticación
+            const response = await axios.post("http://localhost:8001/token", {
                 username: username,
                 password: password
             });
