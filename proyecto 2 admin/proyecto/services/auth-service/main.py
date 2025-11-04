@@ -6,11 +6,12 @@ from pydantic import BaseModel
 from sqlmodel import Session
 
 # Importar funciones de base de datos
-from db import (
+from db_auth import (
     create_db_and_tables, 
     get_session, 
     authenticate_user,
     init_default_users,
+    get_user_by_username,
     User
 )
 
@@ -35,6 +36,10 @@ class LoginRequest(BaseModel):
 class UserCreate(BaseModel):
     username: str
     password: str
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
 
 class Token(BaseModel):
     access_token: str
@@ -116,6 +121,28 @@ def register_user(
         data={"sub": new_user.username}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
+
+# =============================================================================
+# ENDPOINTS DE USUARIOS (para consulta desde otros servicios)
+# =============================================================================
+
+@app.get("/users", response_model=list[UserResponse])
+def get_all_users(session: Session = Depends(get_session)):
+    """Obtiene todos los usuarios registrados."""
+    from sqlmodel import select
+    statement = select(User)
+    users = session.exec(statement).all()
+    return [UserResponse(id=user.id, username=user.username) for user in users]
+
+@app.get("/users/{user_id}", response_model=UserResponse)
+def get_user_by_id(user_id: int, session: Session = Depends(get_session)):
+    """Obtiene un usuario específico por ID."""
+    from sqlmodel import select
+    statement = select(User).where(User.id == user_id)
+    user = session.exec(statement).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return UserResponse(id=user.id, username=user.username)
 
 @app.get("/health")
 def health_check():
