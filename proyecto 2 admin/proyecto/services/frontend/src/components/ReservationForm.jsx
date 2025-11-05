@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 export default function ReservationForm({ 
-  users, 
+  currentUser, 
   editingReservation, 
   onSubmit, 
   onCancel 
@@ -9,29 +9,24 @@ export default function ReservationForm({
   const [formData, setFormData] = useState({
     fecha: '',
     hora: '',
-    usuario_id: '',
-    usuario_nombre: '',
     descripcion: ''
   });
 
   useEffect(() => {
     if (editingReservation) {
+      // Si estamos editando, llenamos el formulario con los datos existentes
       setFormData({
         fecha: editingReservation.fecha,
-        hora: editingReservation.hora.slice(0, 5), // HH:MM formato
-        usuario_id: editingReservation.usuario_id,
-        usuario_nombre: editingReservation.usuario_nombre,
+        hora: editingReservation.hora.slice(0, 5), // Formato HH:MM
         descripcion: editingReservation.descripcion
       });
     } else {
-      // Valores por defecto para nueva reservación
+      // Si es una nueva reserva, usamos valores por defecto
       const today = new Date().toISOString().split('T')[0];
       const now = new Date().toTimeString().slice(0, 5);
       setFormData({
         fecha: today,
         hora: now,
-        usuario_id: '',
-        usuario_nombre: '',
         descripcion: ''
       });
     }
@@ -40,31 +35,20 @@ export default function ReservationForm({
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Validaciones
-    if (!formData.usuario_id || !formData.fecha || !formData.hora) {
-      alert('❌ Por favor completa todos los campos obligatorios');
+    if (!formData.fecha || !formData.hora) {
+      alert('❌ Por favor completa la fecha y la hora');
       return;
     }
 
-    // Preparar datos para enviar
+    // Añadir siempre los datos del usuario actual al enviar
     const submitData = {
       ...formData,
       hora: formData.hora + ':00', // Agregar segundos
-      usuario_id: parseInt(formData.usuario_id)
+      usuario_id: currentUser.id,
+      usuario_nombre: currentUser.username
     };
 
     onSubmit(submitData);
-  };
-
-  const handleUserChange = (e) => {
-    const userId = e.target.value;
-    const user = users.find(u => u.id === parseInt(userId));
-    
-    setFormData({
-      ...formData,
-      usuario_id: userId,
-      usuario_nombre: user ? user.username : ''
-    });
   };
 
   return (
@@ -80,30 +64,21 @@ export default function ReservationForm({
         backgroundColor: 'white'
       }}>
         
-        {/* 👤 Selector de Usuario */}
+        {/* 👤 Muestra del Usuario Autenticado */}
         <div style={{ marginBottom: '15px' }}>
           <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-            👤 Usuario: *
+            👤 Usuario:
           </label>
-          <select
-            value={formData.usuario_id}
-            onChange={handleUserChange}
-            required
-            style={{
-              width: '100%',
-              padding: '10px',
-              border: '1px solid #ddd',
-              borderRadius: '4px',
-              fontSize: '14px'
-            }}
-          >
-            <option value="">Selecciona un usuario...</option>
-            {users.map(user => (
-              <option key={user.id} value={user.id}>
-                {user.username}
-              </option>
-            ))}
-          </select>
+          <p style={{
+            width: '100%',
+            padding: '10px',
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+            fontSize: '14px',
+            backgroundColor: '#e9ecef'
+          }}>
+            {currentUser ? currentUser.username : 'Cargando...'}
+          </p>
         </div>
 
         {/* 📅 Fecha */}

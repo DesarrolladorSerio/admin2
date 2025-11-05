@@ -1,13 +1,12 @@
 import React, { useState } from "react";
-import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
+import authAPI from "./services/authAPI"; // Importar el nuevo servicio de autenticación
 
 const Login = () => {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [err, setErr] = useState("");
     const [success, setSuccess] = useState("");
-
 
     const navigate = useNavigate();
 
@@ -17,16 +16,8 @@ const Login = () => {
         setSuccess("");
 
         try {
-            // Enviar datos como JSON directamente al servicio de autenticación
-            const response = await axios.post("http://localhost:8001/token", {
-                username: username,
-                password: password
-            });
-
-            // Guardar username localmente y redirigir al menú
-            localStorage.setItem('username', username);
+            await authAPI.login(username, password);
             setSuccess("Login successful");
-            console.log("Token:", response.data.access_token);
             navigate('/menu');
 
         } catch (error) {

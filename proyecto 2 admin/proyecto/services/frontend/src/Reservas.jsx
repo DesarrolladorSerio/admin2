@@ -3,14 +3,15 @@ import Calendar from './components/Calendar';
 import ReservationList from './components/ReservationList';
 import ReservationForm from './components/ReservationForm';
 import reservationAPI from './services/reservationAPI';
+import authAPI from './services/authAPI';
 
 export default function Reservas() {
   const [view, setView] = useState('calendar'); // 'calendar', 'list', 'form'
   const [reservations, setReservations] = useState([]);
-  const [users, setUsers] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [editingReservation, setEditingReservation] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadInitialData();
@@ -19,15 +20,15 @@ export default function Reservas() {
   const loadInitialData = async () => {
     setLoading(true);
     try {
-      const [usersData, reservationsData] = await Promise.all([
-        reservationAPI.getUsers(),
+      const [user, reservationsData] = await Promise.all([
+        authAPI.getCurrentUser(),
         reservationAPI.getReservations()
       ]);
-      setUsers(usersData);
+      setCurrentUser(user);
       setReservations(reservationsData);
     } catch (error) {
       console.error('Error loading data:', error);
-      alert('Error al cargar datos');
+      alert('Error al cargar datos. Serás redirigido al login.');
     }
     setLoading(false);
   };
@@ -83,17 +84,17 @@ export default function Reservas() {
   return (
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
       {/* 🎛️ Barra de navegación */}
-      <div style={{ 
-        marginBottom: '20px', 
-        display: 'flex', 
-        gap: '10px', 
+      <div style={{
+        marginBottom: '20px',
+        display: 'flex',
+        gap: '10px',
         flexWrap: 'wrap',
         alignItems: 'center'
       }}>
         <h1 style={{ margin: 0, color: '#333' }}>🏠 Sistema de Reservaciones</h1>
-        
+
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '10px' }}>
-          <button 
+          <button
             onClick={() => setView('calendar')}
             style={{
               padding: '10px 15px',
@@ -107,11 +108,11 @@ export default function Reservas() {
           >
             📅 Vista Calendario
           </button>
-          
-          <button 
+
+          <button
             onClick={() => setView('list')}
             style={{
-              padding: '10px 15px', 
+              padding: '10px 15px',
               backgroundColor: view === 'list' ? '#007bff' : '#f8f9fa',
               color: view === 'list' ? 'white' : '#333',
               border: '1px solid #ddd',
@@ -122,8 +123,8 @@ export default function Reservas() {
           >
             📋 Lista Completa
           </button>
-          
-          <button 
+
+          <button
             onClick={() => {
               setEditingReservation(null);
               setView('form');
@@ -145,8 +146,9 @@ export default function Reservas() {
 
       {/* 📱 Contenido según la vista actual */}
       {view === 'calendar' && (
-        <Calendar 
+        <Calendar
           reservations={reservations}
+          currentUser={currentUser}
           selectedDate={selectedDate}
           onDateSelect={setSelectedDate}
           onEditReservation={(reservation) => {
@@ -158,8 +160,9 @@ export default function Reservas() {
       )}
 
       {view === 'list' && (
-        <ReservationList 
+        <ReservationList
           reservations={reservations}
+          currentUser={currentUser}
           onEditReservation={(reservation) => {
             setEditingReservation(reservation);
             setView('form');
@@ -169,10 +172,10 @@ export default function Reservas() {
       )}
 
       {view === 'form' && (
-        <ReservationForm 
-          users={users}
+        <ReservationForm
+          currentUser={currentUser}
           editingReservation={editingReservation}
-          onSubmit={editingReservation ? 
+          onSubmit={editingReservation ?
             (data) => handleUpdateReservation(editingReservation.id, data) :
             handleCreateReservation
           }
