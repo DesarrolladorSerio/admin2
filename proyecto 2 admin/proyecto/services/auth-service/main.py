@@ -1,9 +1,9 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, constr
 from sqlmodel import Session
 
 # Importar funciones de base de datos
@@ -31,7 +31,7 @@ app = FastAPI()
 # Configurar CORS para permitir peticiones desde el frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    allow_origins=["*"], # Permitir todos los orígenes para depuración
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -44,8 +44,8 @@ class LoginRequest(BaseModel):
     password: str
 
 class UserCreate(BaseModel):
-    username: str
-    password: str
+    username: EmailStr # Requerir que el username sea un email válido
+    password: constr(min_length=8) # Requerir contraseña de mínimo 8 caracteres
 
 class UserResponse(BaseModel):
     id: int
@@ -69,6 +69,36 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+def verify_token(token: str = Depends(oauth2_scheme)):
+    """Verifica y decodifica un token JWT."""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    return username
+
+def get_current_user(
+    username: str = Depends(verify_token),
+    session: Session = Depends(get_session)
+) -> User:
+    """Obtiene el usuario actual basado en el token."""
+    user = get_user_by_username(session, username)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
 
 # =============================================================================
 # EVENTOS DE APLICACIÓN
@@ -102,13 +132,13 @@ async def login_for_access_token(
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
+        data={"sub": user.username, "user_id": user.id}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/register", response_model=Token)
 def register_user(
-    user_data: UserCreate,
+    user_data: UserCreate, # Usar Pydantic para validación automática
     session: Session = Depends(get_session)
 ):
     """Registra un nuevo usuario."""
@@ -128,13 +158,18 @@ def register_user(
     # Crear token automáticamente
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": new_user.username}, expires_delta=access_token_expires
+        data={"sub": new_user.username, "user_id": new_user.id}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
 # =============================================================================
 # ENDPOINTS DE USUARIOS (para consulta desde otros servicios)
 # =============================================================================
+
+@app.get("/users/me", response_model=UserResponse)
+def get_current_user_info(current_user: User = Depends(get_current_user)):
+    """Obtiene la información del usuario autenticado actual."""
+    return UserResponse(id=current_user.id, username=current_user.username)
 
 @app.get("/users", response_model=list[UserResponse])
 def get_all_users(session: Session = Depends(get_session)):

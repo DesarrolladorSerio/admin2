@@ -1,21 +1,22 @@
 import React, { useState } from 'react';
 
-export default function ReservationList({ 
-  reservations, 
-  onEditReservation, 
-  onDeleteReservation 
+export default function ReservationList({
+  reservations,
+  currentUser,
+  onEditReservation,
+  onDeleteReservation
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDate, setFilterDate] = useState('');
 
   // Filtrar reservaciones
   const filteredReservations = reservations.filter(reservation => {
-    const matchesSearch = searchTerm === '' || 
-      reservation.usuario_nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      reservation.descripcion.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesDate = filterDate === '' || reservation.fecha === filterDate;
-    
+    const matchesSearch = searchTerm === '' ||
+      (reservation.usuario_nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (reservation.descripcion || '').toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesDate = filterDate === '' || String(reservation.fecha) === filterDate;
+
     return matchesSearch && matchesDate;
   });
 
@@ -29,11 +30,11 @@ export default function ReservationList({
   return (
     <div>
       <h2>📋 Todas las Reservaciones</h2>
-      
+
       {/* Barra de búsqueda y filtros */}
-      <div style={{ 
-        display: 'flex', 
-        gap: '10px', 
+      <div style={{
+        display: 'flex',
+        gap: '10px',
         marginBottom: '20px',
         flexWrap: 'wrap',
         alignItems: 'center'
@@ -53,7 +54,7 @@ export default function ReservationList({
             }}
           />
         </div>
-        
+
         <div>
           <input
             type="date"
@@ -67,7 +68,7 @@ export default function ReservationList({
             }}
           />
         </div>
-        
+
         {(searchTerm || filterDate) && (
           <button
             onClick={() => {
@@ -89,8 +90,8 @@ export default function ReservationList({
       </div>
 
       {/* Contador de resultados */}
-      <div style={{ 
-        marginBottom: '15px', 
+      <div style={{
+        marginBottom: '15px',
         color: '#666',
         fontSize: '14px'
       }}>
@@ -99,22 +100,22 @@ export default function ReservationList({
 
       {/* Lista de reservaciones */}
       {sortedReservations.length === 0 ? (
-        <div style={{ 
-          padding: '40px', 
-          textAlign: 'center', 
+        <div style={{
+          padding: '40px',
+          textAlign: 'center',
           backgroundColor: '#f8f9fa',
           borderRadius: '5px',
           color: '#666'
         }}>
-          {searchTerm || filterDate ? 
+          {searchTerm || filterDate ?
             '🔍 No se encontraron reservaciones con los filtros aplicados' :
             '📝 No hay reservaciones registradas'
           }
         </div>
       ) : (
         sortedReservations.map(reservation => (
-          <div 
-            key={reservation.id} 
+          <div
+            key={reservation.id}
             style={{
               border: '1px solid #ddd',
               borderRadius: '8px',
@@ -124,83 +125,85 @@ export default function ReservationList({
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
             }}
           >
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
               alignItems: 'flex-start',
               flexWrap: 'wrap',
               gap: '10px'
             }}>
               <div style={{ flex: 1, minWidth: '250px' }}>
-                <div style={{ 
-                  fontSize: '18px', 
-                  fontWeight: 'bold', 
+                <div style={{
+                  fontSize: '18px',
+                  fontWeight: 'bold',
                   marginBottom: '10px',
                   color: '#333'
                 }}>
                   📅 {reservation.fecha} 🕐 {reservation.hora.slice(0, 5)}
                 </div>
-                
+
                 <div style={{ marginBottom: '8px', color: '#555' }}>
-                  👤 <strong>Usuario:</strong> {reservation.usuario_nombre}
+                  👤 <strong>Usuario:</strong> {reservation.usuario_nombre || 'Usuario desconocido'}
                 </div>
-                
+
                 <div style={{ marginBottom: '8px', color: '#555' }}>
                   📝 <strong>Descripción:</strong> {reservation.descripcion || 'Sin descripción'}
                 </div>
-                
-                <div style={{ 
+
+                <div style={{
                   display: 'inline-block',
                   padding: '4px 12px',
                   borderRadius: '12px',
                   fontSize: '12px',
                   fontWeight: 'bold',
-                  backgroundColor: reservation.estado === 'activa' ? '#d4edda' : 
-                                 reservation.estado === 'cancelada' ? '#f8d7da' : '#d1ecf1',
-                  color: reservation.estado === 'activa' ? '#155724' : 
-                         reservation.estado === 'cancelada' ? '#721c24' : '#0c5460'
+                  backgroundColor: reservation.estado === 'activa' ? '#d4edda' :
+                    reservation.estado === 'cancelada' ? '#f8d7da' : '#d1ecf1',
+                  color: reservation.estado === 'activa' ? '#155724' :
+                    reservation.estado === 'cancelada' ? '#721c24' : '#0c5460'
                 }}>
                   🏷️ {reservation.estado.toUpperCase()}
                 </div>
               </div>
-              
-              <div style={{ 
-                display: 'flex', 
-                gap: '8px',
-                flexWrap: 'wrap'
-              }}>
-                <button
-                  onClick={() => onEditReservation(reservation)}
-                  style={{
-                    padding: '8px 16px',
-                    backgroundColor: '#ffc107',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  ✏️ Editar
-                </button>
-                
-                <button
-                  onClick={() => onDeleteReservation(reservation.id)}
-                  style={{
-                    padding: '8px 16px',
-                    backgroundColor: '#dc3545',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  🗑️ Eliminar
-                </button>
-              </div>
+
+              {currentUser && currentUser.id === reservation.usuario_id && (
+                <div style={{
+                  display: 'flex',
+                  gap: '8px',
+                  flexWrap: 'wrap'
+                }}>
+                  <button
+                    onClick={() => onEditReservation(reservation)}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: '#ffc107',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    ✏️ Editar
+                  </button>
+
+                  <button
+                    onClick={() => onDeleteReservation(reservation.id)}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: '#dc3545',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    🗑️ Eliminar
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         ))

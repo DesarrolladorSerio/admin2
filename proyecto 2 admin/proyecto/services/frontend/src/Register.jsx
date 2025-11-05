@@ -1,12 +1,13 @@
 import React, { useState } from "react";
-import axios from "axios";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import authAPI from "./services/authAPI"; // Importar el nuevo servicio de autenticación
 
 const Register = () => {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [err, setErr] = useState("");
     const [success, setSuccess] = useState("");
+    const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -14,20 +15,22 @@ const Register = () => {
         setSuccess("");
 
         try {
-            const response = await axios.post("http://localhost:8001/register", {
+            await authAPI.register({
                 username: username,
                 password: password
             });
-
-            setSuccess("✅ Usuario registrado exitosamente! Token: " + response.data.access_token.substring(0, 20) + "...");
-            console.log("Token completo:", response.data.access_token);
+            setSuccess("✅ Usuario registrado exitosamente! Redirigiendo a login...");
+            // Redirigir al usuario a la página de login después de un registro exitoso
+            setTimeout(() => {
+                navigate("/login");
+            }, 2000);
 
             // Limpiar formulario después de registro exitoso
             setUsername("");
             setPassword("");
 
         } catch (error) {
-            setErr("Registration failed: " + (error.response?.data?.detail || error.message));
+            setErr("Registration failed: " + error.message);
         }
     };
 

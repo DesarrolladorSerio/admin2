@@ -1,4 +1,6 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
@@ -13,10 +15,15 @@ from db_reservas import (
     update_reservation,
     delete_reservation,
     get_reservations_by_date_range,
-    get_all_users,
-    Reservation,
-    User
+    Reservation
 )
+
+# =============================================================================
+# CONFIGURACIÓN DE AUTENTICACIÓN
+# =============================================================================
+SECRET_KEY = "un-secreto-muy-fuerte-y-largo"
+ALGORITHM = "HS256"
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
 
 app = FastAPI(title="Reservations API")
 
@@ -28,6 +35,30 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# =============================================================================
+# MODELOS Y FUNCIONES DE AUTENTICACIÓN
+# =============================================================================
+
+class TokenData(BaseModel):
+    username: str
+    user_id: int
+
+def get_current_user_data_from_token(token: str = Depends(oauth2_scheme)) -> TokenData:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        user_id: int = payload.get("user_id")
+        if username is None or user_id is None:
+            raise credentials_exception
+        return TokenData(username=username, user_id=user_id)
+    except JWTError:
+        raise credentials_exception
 
 # =============================================================================
 # MODELOS DE DATOS (Pydantic)
@@ -43,10 +74,7 @@ class ReservationCreate(BaseModel):
 class ReservationUpdate(BaseModel):
     fecha: Optional[date] = None
     hora: Optional[str] = None
-    usuario_id: Optional[int] = None
-    usuario_nombre: Optional[str] = None
     descripcion: Optional[str] = None
-    estado: Optional[str] = None
 
 class ReservationResponse(BaseModel):
     id: int
@@ -57,10 +85,6 @@ class ReservationResponse(BaseModel):
     descripcion: str
     estado: str
     created_at: datetime
-
-class UserResponse(BaseModel):
-    id: int
-    username: str
 
 # =============================================================================
 # EVENTOS
@@ -79,18 +103,19 @@ def on_startup():
 def health_check():
     return {"status": "ok", "service": "reservations"}
 
-@app.get("/users", response_model=List[UserResponse])
-def get_users(session: Session = Depends(get_session)):
-    users = get_all_users(session)
-    return users
-
 @app.post("/reservations", response_model=ReservationResponse)
 def create_new_reservation(
-    reservation: ReservationCreate,
-    session: Session = Depends(get_session)
+    reservation_data: ReservationCreate,
+    session: Session = Depends(get_session),
+    current_user: TokenData = Depends(get_current_user_data_from_token)
 ):
+    if reservation_data.usuario_id != current_user.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No puedes crear una reserva para otro usuario."
+        )
     try:
-        new_reservation = create_reservation(session, reservation)
+        new_reservation = create_reservation(session, reservation_data)
         return new_reservation
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -111,21 +136,42 @@ def get_reservation(reservation_id: int, session: Session = Depends(get_session)
 def update_reservation_endpoint(
     reservation_id: int,
     reservation_update: ReservationUpdate,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    current_user: TokenData = Depends(get_current_user_data_from_token)
 ):
-    reservation = update_reservation(session, reservation_id, reservation_update)
+    reservation = get_reservation_by_id(session, reservation_id)
     if not reservation:
         raise HTTPException(status_code=404, detail="Reservación no encontrada")
-    return reservation
+    
+    if reservation.usuario_id != current_user.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para editar esta reservación."
+        )
+
+    updated_reservation = update_reservation(session, reservation_id, reservation_update)
+    return updated_reservation
 
 @app.delete("/reservations/{reservation_id}")
 def delete_reservation_endpoint(
     reservation_id: int,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    current_user: TokenData = Depends(get_current_user_data_from_token)
 ):
+    reservation_to_delete = get_reservation_by_id(session, reservation_id)
+
+    if not reservation_to_delete:
+        raise HTTPException(status_code=404, detail="Reservación no encontrada")
+
+    if reservation_to_delete.usuario_id != current_user.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="No tienes permiso para eliminar esta reservación."
+        )
+
     success = delete_reservation(session, reservation_id)
     if not success:
-        raise HTTPException(status_code=404, detail="Reservación no encontrada")
+        raise HTTPException(status_code=404, detail="Reservación no encontrada durante la eliminación")
     return {"message": "Reservación eliminada exitosamente"}
 
 @app.get("/reservations/calendar/{start_date}/{end_date}", response_model=List[ReservationResponse])
@@ -136,4 +182,3 @@ def get_calendar_reservations(
 ):
     reservations = get_reservations_by_date_range(session, start_date, end_date)
     return reservations
-

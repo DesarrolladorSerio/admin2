@@ -5,6 +5,6 @@ passlib[bcrypt]
 bcrypt==3.2.0
 python-jose[cryptography]
 python-multipart
-sqlmodel
 sqlalchemy
 sqlmodel
+email-validator
