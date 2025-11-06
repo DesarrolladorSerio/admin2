@@ -13,6 +13,10 @@ from db_auth import (
     authenticate_user,
     init_default_users,
     get_user_by_username,
+    get_user_by_email,
+    get_user_by_rut,
+    get_user_by_login_identifier,
+    create_user,
     User
 )
 
@@ -40,16 +44,22 @@ app.add_middleware(
 # MODELOS DE DATOS (Pydantic)
 # =============================================================================
 class LoginRequest(BaseModel):
-    username: str
+    identifier: str  # Puede ser email o RUT
     password: str
+    login_type: str = "email"  # "email" o "rut"
 
 class UserCreate(BaseModel):
-    username: EmailStr # Requerir que el username sea un email válido
-    password: constr(min_length=8) # Requerir contraseña de mínimo 8 caracteres
+    email: EmailStr  # Email válido requerido
+    nombre: str      # Nombre completo
+    rut: str         # RUT OBLIGATORIO
+    password: str    # Contraseña (validación mínimo 8 caracteres se hará en el endpoint)
 
 class UserResponse(BaseModel):
     id: int
-    username: str
+    username: str  # Mantener para compatibilidad
+    email: str
+    nombre: str
+    rut: str | None
 
 class Token(BaseModel):
     access_token: str
@@ -122,43 +132,66 @@ async def login_for_access_token(
     login_data: LoginRequest,
     session: Session = Depends(get_session)
 ):
-    """Endpoint para el login con JSON."""
-    user = authenticate_user(session, login_data.username, login_data.password)
+    """Endpoint para el login con JSON. Soporta email y RUT."""
+    user = authenticate_user(session, login_data.identifier, login_data.password)
     if not user:
+        login_type_msg = "email" if login_data.login_type == "email" else "RUT"
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail=f"Incorrect {login_type_msg} or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username, "user_id": user.id}, expires_delta=access_token_expires
+        data={"sub": user.email, "user_id": user.id}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/register", response_model=Token)
 def register_user(
-    user_data: UserCreate, # Usar Pydantic para validación automática
+    user_data: UserCreate,
     session: Session = Depends(get_session)
 ):
-    """Registra un nuevo usuario."""
-    from db_auth import get_user_by_username, create_user
+    """Registra un nuevo usuario con email, nombre y opcionalmente RUT."""
     
-    # Verificar si el usuario ya existe
-    existing_user = get_user_by_username(session, user_data.username)
+    # Validar longitud de contraseña
+    if len(user_data.password) < 8:
+        raise HTTPException(
+            status_code=400,
+            detail="La contraseña debe tener al menos 8 caracteres"
+        )
+    
+    # Verificar si el email ya existe
+    existing_user = get_user_by_email(session, user_data.email)
     if existing_user:
         raise HTTPException(
             status_code=400,
-            detail="El usuario ya existe"
+            detail="El email ya está registrado"
         )
     
+    # Verificar si el RUT ya existe (si se proporciona)
+    if user_data.rut:
+        existing_rut = get_user_by_rut(session, user_data.rut)
+        if existing_rut:
+            raise HTTPException(
+                status_code=400,
+                detail="El RUT ya está registrado"
+            )
+    
     # Crear nuevo usuario
-    new_user = create_user(session, user_data.username, user_data.password)
+    new_user = create_user(
+        session, 
+        username=user_data.email,  # usar email como username para compatibilidad
+        email=user_data.email,
+        nombre=user_data.nombre,
+        password=user_data.password,
+        rut=user_data.rut
+    )
     
     # Crear token automáticamente
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": new_user.username, "user_id": new_user.id}, expires_delta=access_token_expires
+        data={"sub": new_user.email, "user_id": new_user.id}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -169,7 +202,13 @@ def register_user(
 @app.get("/users/me", response_model=UserResponse)
 def get_current_user_info(current_user: User = Depends(get_current_user)):
     """Obtiene la información del usuario autenticado actual."""
-    return UserResponse(id=current_user.id, username=current_user.username)
+    return UserResponse(
+        id=current_user.id, 
+        username=current_user.username,
+        email=current_user.email,
+        nombre=current_user.nombre,
+        rut=current_user.rut
+    )
 
 @app.get("/users", response_model=list[UserResponse])
 def get_all_users(session: Session = Depends(get_session)):
@@ -177,7 +216,15 @@ def get_all_users(session: Session = Depends(get_session)):
     from sqlmodel import select
     statement = select(User)
     users = session.exec(statement).all()
-    return [UserResponse(id=user.id, username=user.username) for user in users]
+    return [
+        UserResponse(
+            id=user.id, 
+            username=user.username,
+            email=user.email,
+            nombre=user.nombre,
+            rut=user.rut
+        ) for user in users
+    ]
 
 @app.get("/users/{user_id}", response_model=UserResponse)
 def get_user_by_id(user_id: int, session: Session = Depends(get_session)):
@@ -187,7 +234,13 @@ def get_user_by_id(user_id: int, session: Session = Depends(get_session)):
     user = session.exec(statement).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    return UserResponse(id=user.id, username=user.username)
+    return UserResponse(
+        id=user.id, 
+        username=user.username,
+        email=user.email,
+        nombre=user.nombre,
+        rut=user.rut
+    )
 
 @app.get("/health")
 def health_check():

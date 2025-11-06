@@ -144,7 +144,11 @@ export default function ReservationList({
                 </div>
 
                 <div style={{ marginBottom: '8px', color: '#555' }}>
-                  👤 <strong>Usuario:</strong> {reservation.usuario_nombre || 'Usuario desconocido'}
+                  👤 <strong>Usuario:</strong> {
+                    reservation.usuario_id === currentUser?.id
+                      ? (currentUser?.nombre || currentUser?.username || 'Usuario actual')
+                      : (reservation.usuario_nombre || 'Usuario desconocido')
+                  }
                 </div>
 
                 <div style={{ marginBottom: '8px', color: '#555' }}>

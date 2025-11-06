@@ -31,9 +31,13 @@ authClient.interceptors.response.use(
 );
 
 class AuthAPI {
-  async login(username, password) {
+  async login(identifier, password, loginType = "email") {
     try {
-      const response = await authClient.post('/token', { username, password });
+      const response = await authClient.post('/token', {
+        identifier,
+        password,
+        login_type: loginType
+      });
       if (response.data.access_token) {
         localStorage.setItem('authToken', response.data.access_token);
       }
@@ -46,7 +50,11 @@ class AuthAPI {
 
   async register(userData) {
     try {
+      // userData debe contener: { email, nombre, rut, password }
       const response = await authClient.post('/register', userData);
+      if (response.data.access_token) {
+        localStorage.setItem('authToken', response.data.access_token);
+      }
       return response.data;
     } catch (error) {
       console.error('Error during registration:', error.response?.data || error.message);

@@ -63,7 +63,7 @@ export default function ReservationForm({
       ...formData,
       hora: formData.hora + ':00', // Agregar segundos
       usuario_id: currentUser.id,
-      usuario_nombre: currentUser.username
+      usuario_nombre: currentUser.nombre || currentUser.username // Usar nombre completo si está disponible
     };
 
     onSubmit(submitData);
