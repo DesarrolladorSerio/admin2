@@ -1,23 +1,40 @@
 import React, { useState, useEffect } from 'react';
+import reservationAPI from '../services/reservationAPI';
 
-export default function ReservationForm({ 
-  currentUser, 
-  editingReservation, 
-  onSubmit, 
-  onCancel 
+export default function ReservationForm({
+  currentUser,
+  editingReservation,
+  onSubmit,
+  onCancel
 }) {
   const [formData, setFormData] = useState({
     fecha: '',
     hora: '',
+    tipo_tramite: '',
     descripcion: ''
   });
 
+  const [tiposTramites, setTiposTramites] = useState([]);
+
   useEffect(() => {
+    // Cargar tipos de trámites
+    const loadTiposTramites = async () => {
+      try {
+        const tipos = await reservationAPI.getTiposTramites();
+        setTiposTramites(tipos);
+      } catch (error) {
+        console.error('Error cargando tipos de trámites:', error);
+      }
+    };
+
+    loadTiposTramites();
+
     if (editingReservation) {
       // Si estamos editando, llenamos el formulario con los datos existentes
       setFormData({
         fecha: editingReservation.fecha,
         hora: editingReservation.hora.slice(0, 5), // Formato HH:MM
+        tipo_tramite: editingReservation.tipo_tramite || '',
         descripcion: editingReservation.descripcion
       });
     } else {
@@ -27,6 +44,7 @@ export default function ReservationForm({
       setFormData({
         fecha: today,
         hora: now,
+        tipo_tramite: '',
         descripcion: ''
       });
     }
@@ -34,9 +52,9 @@ export default function ReservationForm({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
-    if (!formData.fecha || !formData.hora) {
-      alert('❌ Por favor completa la fecha y la hora');
+
+    if (!formData.fecha || !formData.hora || !formData.tipo_tramite) {
+      alert('❌ Por favor completa la fecha, hora y tipo de trámite');
       return;
     }
 
@@ -57,13 +75,13 @@ export default function ReservationForm({
         {editingReservation ? '✏️ Editar Reservación' : '➕ Nueva Reservación'}
       </h2>
 
-      <form onSubmit={handleSubmit} style={{ 
-        border: '1px solid #ddd', 
-        borderRadius: '8px', 
+      <form onSubmit={handleSubmit} style={{
+        border: '1px solid #ddd',
+        borderRadius: '8px',
         padding: '20px',
         backgroundColor: 'white'
       }}>
-        
+
         {/* 👤 Muestra del Usuario Autenticado */}
         <div style={{ marginBottom: '15px' }}>
           <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
@@ -119,6 +137,42 @@ export default function ReservationForm({
               fontSize: '14px'
             }}
           />
+        </div>
+
+        {/* 🏛️ Tipo de Trámite */}
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+            🏛️ Tipo de Trámite: *
+          </label>
+          <select
+            value={formData.tipo_tramite}
+            onChange={(e) => setFormData({ ...formData, tipo_tramite: e.target.value })}
+            required
+            style={{
+              width: '100%',
+              padding: '10px',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              fontSize: '14px'
+            }}
+          >
+            <option value="">Selecciona un tipo de trámite...</option>
+            {tiposTramites.map((tipo) => (
+              <option key={tipo.id} value={tipo.id}>
+                {tipo.nombre} ({tipo.duracion_estimada})
+              </option>
+            ))}
+          </select>
+          {formData.tipo_tramite && tiposTramites.length > 0 && (
+            <p style={{
+              fontSize: '12px',
+              color: '#666',
+              marginTop: '5px',
+              fontStyle: 'italic'
+            }}>
+              {tiposTramites.find(t => t.id === formData.tipo_tramite)?.descripcion}
+            </p>
+          )}
         </div>
 
         {/* 📝 Descripción */}

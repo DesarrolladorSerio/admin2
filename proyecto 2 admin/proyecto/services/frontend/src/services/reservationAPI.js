@@ -46,6 +46,11 @@ class ReservationAPI {
     const response = await apiClient.get(`/reservations/${id}`);
     return response.data;
   }
+
+  async getTiposTramites() {
+    const response = await apiClient.get('/tipos-tramites');
+    return response.data;
+  }
 }
 
 export default new ReservationAPI();

@@ -13,7 +13,8 @@ export default function ReservationList({
   const filteredReservations = reservations.filter(reservation => {
     const matchesSearch = searchTerm === '' ||
       (reservation.usuario_nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (reservation.descripcion || '').toLowerCase().includes(searchTerm.toLowerCase());
+      (reservation.descripcion || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (reservation.tipo_tramite || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesDate = filterDate === '' || String(reservation.fecha) === filterDate;
 
@@ -42,7 +43,7 @@ export default function ReservationList({
         <div style={{ flex: '1', minWidth: '200px' }}>
           <input
             type="text"
-            placeholder="🔍 Buscar por usuario o descripción..."
+            placeholder="🔍 Buscar por usuario, trámite o descripción..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             style={{
@@ -144,6 +145,10 @@ export default function ReservationList({
 
                 <div style={{ marginBottom: '8px', color: '#555' }}>
                   👤 <strong>Usuario:</strong> {reservation.usuario_nombre || 'Usuario desconocido'}
+                </div>
+
+                <div style={{ marginBottom: '8px', color: '#555' }}>
+                  🏛️ <strong>Tipo de Trámite:</strong> {reservation.tipo_tramite || 'No especificado'}
                 </div>
 
                 <div style={{ marginBottom: '8px', color: '#555' }}>

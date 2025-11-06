@@ -69,11 +69,13 @@ class ReservationCreate(BaseModel):
     hora: str
     usuario_id: int
     usuario_nombre: str
+    tipo_tramite: str  # Nuevo campo para el tipo de trámite
     descripcion: Optional[str] = ""
 
 class ReservationUpdate(BaseModel):
     fecha: Optional[date] = None
     hora: Optional[str] = None
+    tipo_tramite: Optional[str] = None  # Permitir actualizar el tipo de trámite
     descripcion: Optional[str] = None
 
 class ReservationResponse(BaseModel):
@@ -82,6 +84,7 @@ class ReservationResponse(BaseModel):
     hora: str
     usuario_id: int
     usuario_nombre: str
+    tipo_tramite: str  # Nuevo campo en la respuesta
     descripcion: str
     estado: str
     created_at: datetime
@@ -182,3 +185,58 @@ def get_calendar_reservations(
 ):
     reservations = get_reservations_by_date_range(session, start_date, end_date)
     return reservations
+
+@app.get("/tipos-tramites")
+def get_tipos_tramites():
+    """Obtener los tipos de trámites disponibles en la municipalidad"""
+    tipos_tramites = [
+        {
+            "id": "licencia_conducir",
+            "nombre": "Licencia de Conducir",
+            "descripcion": "Obtención o renovación de licencia de conducir",
+            "duracion_estimada": "30 minutos"
+        },
+        {
+            "id": "permiso_circulacion",
+            "nombre": "Permiso de Circulación",
+            "descripcion": "Trámite de permiso de circulación vehicular",
+            "duracion_estimada": "15 minutos"
+        },
+        {
+            "id": "certificado_residencia",
+            "nombre": "Certificado de Residencia",
+            "descripcion": "Certificado que acredita residencia en la comuna",
+            "duracion_estimada": "10 minutos"
+        },
+        {
+            "id": "patente_comercial",
+            "nombre": "Patente Comercial",
+            "descripcion": "Solicitud o renovación de patente comercial",
+            "duracion_estimada": "45 minutos"
+        },
+        {
+            "id": "permiso_edificacion",
+            "nombre": "Permiso de Edificación",
+            "descripcion": "Permisos para construcción y edificación",
+            "duracion_estimada": "60 minutos"
+        },
+        {
+            "id": "registro_civil",
+            "nombre": "Registro Civil",
+            "descripcion": "Trámites de registro civil (certificados, matrimonio, etc.)",
+            "duracion_estimada": "20 minutos"
+        },
+        {
+            "id": "subsidios",
+            "nombre": "Subsidios Municipales",
+            "descripcion": "Solicitud de subsidios y beneficios municipales",
+            "duracion_estimada": "40 minutos"
+        },
+        {
+            "id": "otros",
+            "nombre": "Otros Trámites",
+            "descripcion": "Otros trámites municipales no especificados",
+            "duracion_estimada": "30 minutos"
+        }
+    ]
+    return tipos_tramites

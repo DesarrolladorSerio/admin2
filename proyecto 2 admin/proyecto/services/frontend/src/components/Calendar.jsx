@@ -166,6 +166,9 @@ export default function Calendar({
                   <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>
                     🕐 {reservation.hora?.slice(0, 5)} - {reservation.usuario_nombre || 'Usuario desconocido'}
                   </div>
+                  <div style={{ color: '#0066cc', marginBottom: '5px', fontWeight: 'bold' }}>
+                    🏛️ {reservation.tipo_tramite || 'Trámite no especificado'}
+                  </div>
                   <div style={{ color: '#666', marginBottom: '5px' }}>
                     📝 {reservation.descripcion}
                   </div>

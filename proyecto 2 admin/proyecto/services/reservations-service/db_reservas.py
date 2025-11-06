@@ -20,6 +20,7 @@ class Reservation(SQLModel, table=True):
     hora: str
     usuario_id: int # Ya no es una llave foránea
     usuario_nombre: str
+    tipo_tramite: str  # Nuevo campo para el tipo de trámite
     descripcion: str = ""
     estado: str = "activa"  # activa, cancelada, completada
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -41,6 +42,7 @@ def create_reservation(session: Session, reservation_data):
         hora=reservation_data.hora,
         usuario_id=reservation_data.usuario_id,
         usuario_nombre=reservation_data.usuario_nombre,
+        tipo_tramite=reservation_data.tipo_tramite,
         descripcion=reservation_data.descripcion
     )
     session.add(reservation)
