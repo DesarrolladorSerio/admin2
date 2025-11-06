@@ -3,6 +3,7 @@ import Login from './Login';
 import Register from './Register';
 import Menu from './Menu';
 import Reservas from './Reservas';
+import DocumentsComponent from './components/DocumentsComponent';
 
 export default function App() {
   return (
@@ -13,6 +14,7 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/menu" element={<Menu />} />
           <Route path="/reservas" element={<Reservas />} />
+          <Route path="/documentos" element={<DocumentsComponent />} />
           <Route path="*" element={<Navigate to="/login" />} />
         </Routes>
       </div>

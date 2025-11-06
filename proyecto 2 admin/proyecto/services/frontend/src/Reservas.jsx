@@ -41,7 +41,8 @@ export default function Reservas() {
       alert('✅ Reservación creada exitosamente');
     } catch (error) {
       console.error('Error creating reservation:', error);
-      alert('❌ Error al crear reservación');
+      const errorMessage = error.response?.data?.detail || 'Error al crear reservación';
+      alert(`❌ ${errorMessage}`);
     }
   };
 
@@ -54,7 +55,8 @@ export default function Reservas() {
       alert('✅ Reservación actualizada exitosamente');
     } catch (error) {
       console.error('Error updating reservation:', error);
-      alert('❌ Error al actualizar reservación');
+      const errorMessage = error.response?.data?.detail || 'Error al actualizar reservación';
+      alert(`❌ ${errorMessage}`);
     }
   };
 
@@ -62,7 +64,7 @@ export default function Reservas() {
     if (!window.confirm('¿Estás seguro de que quieres eliminar esta reservación?')) {
       return;
     }
-    
+
     try {
       await reservationAPI.deleteReservation(id);
       setReservations(reservations.filter(r => r.id !== id));
