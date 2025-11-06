@@ -74,6 +74,21 @@ export default function Menu() {
                     📅 Ir a Reservas
                 </button>
                 <button
+                    onClick={() => navigate('/documentos')}
+                    style={{
+                        padding: '12px 20px',
+                        background: '#28a745',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: 6,
+                        marginRight: '10px',
+                        fontSize: '16px',
+                        cursor: 'pointer'
+                    }}
+                >
+                    📄 Documentos
+                </button>
+                <button
                     onClick={handleLogout}
                     style={{
                         padding: '12px 20px',

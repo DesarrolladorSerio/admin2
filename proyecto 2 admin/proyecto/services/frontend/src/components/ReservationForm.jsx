@@ -15,6 +15,8 @@ export default function ReservationForm({
   });
 
   const [tiposTramites, setTiposTramites] = useState([]);
+  const [availabilityStatus, setAvailabilityStatus] = useState(null);
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
 
   useEffect(() => {
     // Cargar tipos de trámites
@@ -50,11 +52,46 @@ export default function ReservationForm({
     }
   }, [editingReservation]);
 
-  const handleSubmit = (e) => {
+  // Función para verificar disponibilidad
+  const checkAvailability = async (fecha, hora, tipoTramite) => {
+    if (!fecha || !hora || !tipoTramite) {
+      setAvailabilityStatus(null);
+      return;
+    }
+
+    setCheckingAvailability(true);
+    try {
+      const reservationId = editingReservation ? editingReservation.id : null;
+      const result = await reservationAPI.checkAvailability(fecha, hora, tipoTramite, reservationId);
+      setAvailabilityStatus(result);
+    } catch (error) {
+      console.error('Error checking availability:', error);
+      setAvailabilityStatus({ available: false, message: 'Error al verificar disponibilidad' });
+    } finally {
+      setCheckingAvailability(false);
+    }
+  };
+
+  // Verificar disponibilidad cuando cambien los datos relevantes
+  useEffect(() => {
+    const delayTimer = setTimeout(() => {
+      checkAvailability(formData.fecha, formData.hora, formData.tipo_tramite);
+    }, 500); // Delay para evitar muchas consultas mientras el usuario escribe
+
+    return () => clearTimeout(delayTimer);
+  }, [formData.fecha, formData.hora, formData.tipo_tramite]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!formData.fecha || !formData.hora || !formData.tipo_tramite) {
       alert('❌ Por favor completa la fecha, hora y tipo de trámite');
+      return;
+    }
+
+    // Verificar disponibilidad antes de enviar
+    if (availabilityStatus && !availabilityStatus.available) {
+      alert(`❌ ${availabilityStatus.message}`);
       return;
     }
 
@@ -175,6 +212,33 @@ export default function ReservationForm({
           )}
         </div>
 
+        {/* ✅ Indicador de Disponibilidad */}
+        {(formData.fecha && formData.hora && formData.tipo_tramite) && (
+          <div style={{ marginBottom: '15px' }}>
+            {checkingAvailability ? (
+              <div style={{
+                padding: '10px',
+                backgroundColor: '#f8f9fa',
+                border: '1px solid #dee2e6',
+                borderRadius: '4px',
+                color: '#6c757d'
+              }}>
+                🔄 Verificando disponibilidad...
+              </div>
+            ) : availabilityStatus ? (
+              <div style={{
+                padding: '10px',
+                backgroundColor: availabilityStatus.available ? '#d4edda' : '#f8d7da',
+                border: `1px solid ${availabilityStatus.available ? '#c3e6cb' : '#f5c6cb'}`,
+                borderRadius: '4px',
+                color: availabilityStatus.available ? '#155724' : '#721c24'
+              }}>
+                {availabilityStatus.available ? '✅' : '❌'} {availabilityStatus.message}
+              </div>
+            ) : null}
+          </div>
+        )}
+
         {/* 📝 Descripción */}
         <div style={{ marginBottom: '20px' }}>
           <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
@@ -215,13 +279,17 @@ export default function ReservationForm({
 
           <button
             type="submit"
+            disabled={availabilityStatus && !availabilityStatus.available}
             style={{
               padding: '10px 20px',
-              backgroundColor: editingReservation ? '#ffc107' : '#28a745',
+              backgroundColor: (availabilityStatus && !availabilityStatus.available)
+                ? '#6c757d'
+                : (editingReservation ? '#ffc107' : '#28a745'),
               color: 'white',
               border: 'none',
               borderRadius: '4px',
-              cursor: 'pointer'
+              cursor: (availabilityStatus && !availabilityStatus.available) ? 'not-allowed' : 'pointer',
+              opacity: (availabilityStatus && !availabilityStatus.available) ? 0.6 : 1
             }}
           >
             {editingReservation ? '✅ Actualizar' : '✅ Crear Reservación'}

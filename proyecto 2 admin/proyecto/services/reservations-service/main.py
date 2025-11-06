@@ -117,6 +117,16 @@ def create_new_reservation(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No puedes crear una reserva para otro usuario."
         )
+    
+    # Validar conflictos de horario
+    from db_reservas import check_time_conflict
+    conflict_result = check_time_conflict(session, reservation_data.fecha, reservation_data.hora, reservation_data.tipo_tramite)
+    if conflict_result["has_conflict"]:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=conflict_result["message"]
+        )
+    
     try:
         new_reservation = create_reservation(session, reservation_data)
         return new_reservation
@@ -151,6 +161,26 @@ def update_reservation_endpoint(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permiso para editar esta reservación."
         )
+
+    # Validar conflictos de horario si se está cambiando fecha, hora o tipo de trámite
+    from db_reservas import check_time_conflict
+    update_dict = reservation_update.dict(exclude_unset=True)
+    
+    if 'fecha' in update_dict or 'hora' in update_dict or 'tipo_tramite' in update_dict:
+        nueva_fecha = update_dict.get('fecha', reservation.fecha)
+        nueva_hora = update_dict.get('hora', reservation.hora)
+        nuevo_tipo = update_dict.get('tipo_tramite', reservation.tipo_tramite)
+        
+        # Agregar segundos si no están presentes
+        if nueva_hora and ':' in nueva_hora and len(nueva_hora.split(':')) == 2:
+            nueva_hora += ':00'
+        
+        conflict_result = check_time_conflict(session, nueva_fecha, nueva_hora, nuevo_tipo, exclude_reservation_id=reservation_id)
+        if conflict_result["has_conflict"]:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=conflict_result["message"]
+            )
 
     updated_reservation = update_reservation(session, reservation_id, reservation_update)
     return updated_reservation
@@ -240,3 +270,29 @@ def get_tipos_tramites():
         }
     ]
     return tipos_tramites
+
+@app.get("/check-availability/{fecha}/{hora}/{tipo_tramite}")
+def check_availability(
+    fecha: date,
+    hora: str,
+    tipo_tramite: str,
+    session: Session = Depends(get_session),
+    reservation_id: Optional[int] = None
+):
+    """Verificar si un horario está disponible para reserva"""
+    from db_reservas import check_time_conflict
+    
+    # Agregar segundos si no están presentes
+    if ':' in hora and len(hora.split(':')) == 2:
+        hora += ':00'
+    
+    conflict_result = check_time_conflict(session, fecha, hora, tipo_tramite, exclude_reservation_id=reservation_id)
+    
+    return {
+        "available": not conflict_result["has_conflict"],
+        "fecha": fecha,
+        "hora": hora,
+        "tipo_tramite": tipo_tramite,
+        "message": conflict_result["message"],
+        "conflicting_reservation": conflict_result["conflicting_reservation"]
+    }

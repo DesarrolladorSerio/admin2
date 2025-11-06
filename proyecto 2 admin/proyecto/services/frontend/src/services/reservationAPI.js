@@ -51,6 +51,12 @@ class ReservationAPI {
     const response = await apiClient.get('/tipos-tramites');
     return response.data;
   }
+
+  async checkAvailability(fecha, hora, tipoTramite, reservationId = null) {
+    const params = reservationId ? `?reservation_id=${reservationId}` : '';
+    const response = await apiClient.get(`/check-availability/${fecha}/${hora}/${tipoTramite}${params}`);
+    return response.data;
+  }
 }
 
 export default new ReservationAPI();
