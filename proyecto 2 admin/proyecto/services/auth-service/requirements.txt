@@ -8,3 +8,4 @@ python-multipart
 sqlalchemy
 sqlmodel
 email-validator
+httpx

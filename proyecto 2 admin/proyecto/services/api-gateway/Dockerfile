@@ -2,8 +2,11 @@
 FROM nginx:1.25.5-alpine
 
 LABEL maintainer="Augusto Fuenzalida" \
-      version="1.0" \
-      description="API Gateway con Nginx para Proyecto Redes 2025-II"
+    version="1.0" \
+    description="API Gateway con Nginx para Proyecto Redes 2025-II"
+
+# Instalar wget para healthcheck
+RUN apk add --no-cache wget
 
 # Crear y ajustar permisos para directorios usados por Nginx
 RUN mkdir -p /var/cache/nginx /var/run /var/log/nginx && \

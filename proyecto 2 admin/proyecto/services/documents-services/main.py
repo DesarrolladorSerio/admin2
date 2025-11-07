@@ -6,9 +6,15 @@ from typing import List, Optional
 import io
 from datetime import datetime
 import json
+import httpx
+import logging
 
 from db_documents import documents_db, DocumentType, Document
 from storage_service import storage, validate_file_type, calculate_file_checksum
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Documents Service - Sistema Municipal", 
@@ -24,6 +30,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# =============================================================================
+# FUNCIÓN HELPER PARA NOTIFICACIONES
+# =============================================================================
+
+async def send_notification(notification_type: str, recipient_email: str, data: dict):
+    """Envía notificación al servicio de notificaciones de forma no bloqueante"""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                "http://notifications-service:8004/notifications/send",
+                json={
+                    "notification_type": notification_type,
+                    "recipient_email": recipient_email,
+                    "data": data
+                }
+            )
+            logger.info(f"Notificación enviada: {notification_type} a {recipient_email}")
+    except Exception as e:
+        logger.error(f"Error enviando notificación: {str(e)}")
 
 # =============================================================================
 # ENDPOINTS DE SALUD Y CONFIGURACIÓN
@@ -101,7 +127,8 @@ async def upload_document(
     description: Optional[str] = Form(None),
     tags: Optional[str] = Form(None),
     is_public: bool = Form(False),
-    user_id: Optional[int] = Header(default=2, alias="x-user-id")
+    user_id: Optional[int] = Header(default=2, alias="x-user-id"),
+    user_email: Optional[str] = Header(default=None, alias="x-user-email")
 ):
     """Subir un nuevo documento al sistema"""
     # Si no viene user_id, usar 2 por defecto
@@ -188,6 +215,23 @@ async def upload_document(
         }
         
         document_id = documents_db.create_document(document_data)
+        
+        # Enviar notificación de documento subido (no bloqueante)
+        if user_email:
+            try:
+                await send_notification(
+                    notification_type="document",
+                    recipient_email=user_email,
+                    data={
+                        "user_name": f"Usuario {user_id}",
+                        "document_name": file.filename,
+                        "document_type": document_type,
+                        "status": "uploaded",
+                        "upload_date": datetime.now().strftime("%Y-%m-%d %H:%M")
+                    }
+                )
+            except Exception as e:
+                logger.error(f"Error enviando notificación de documento: {str(e)}")
         
         return {
             "success": True,

@@ -25,10 +25,13 @@ LABEL maintainer="Augusto Fuenzalida" \
       version="1.0" \
       description="Frontend compilado servido con Nginx"
 
+# Instalar wget para healthcheck
+RUN apk add --no-cache wget
+
 # Crear y dar permisos a directorios usados por Nginx
 RUN mkdir -p /var/cache/nginx /var/run /var/log/nginx && \
-    touch /var/run/nginx.pid && \
-    chown -R nginx:nginx /var/cache/nginx /var/run /var/log/nginx /var/run/nginx.pid
+      touch /var/run/nginx.pid && \
+      chown -R nginx:nginx /var/cache/nginx /var/run /var/log/nginx /var/run/nginx.pid
 
 # Copiar configuración de Nginx
 COPY nginx.conf /etc/nginx/conf.d/default.conf

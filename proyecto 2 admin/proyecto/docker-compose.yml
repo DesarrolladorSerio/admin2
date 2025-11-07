@@ -102,6 +102,26 @@ services:
       storage_net:
 
   # ==========================
+  # 🔴 Redis - Sistema de Cola
+  # ==========================
+  redis:
+    image: redis:7-alpine
+    container_name: redis_queue
+    command: redis-server --appendonly yes
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      backend_net:
+
+  # ==========================
   # ⚙️ Servicio de Autenticación (FastAPI)
   # ==========================
   auth-service:
@@ -197,6 +217,86 @@ services:
       storage_net:
 
   # ==========================
+  # ⚙️ Servicio de Notificaciones (FastAPI + Celery)
+  # ==========================
+  notifications-service:
+    build:
+      context: ./services/notificacion-service
+      dockerfile: Dockerfile
+    container_name: notifications_service
+    env_file:
+      - .env
+    environment:
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply@sistema.com}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Sistema de Reservas}
+      SMTP_TLS: ${SMTP_TLS:-true}
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/0"
+      AUTH_SERVICE_URL: "http://auth-service:8000"
+      RESERVATIONS_SERVICE_URL: "http://reservations-service:8000"
+      DOCUMENTS_SERVICE_URL: "http://documents-service:8003"
+      SECRET_KEY: "un-secreto-muy-fuerte-y-largo"
+      ALGORITHM: "HS256"
+    ports:
+      - "${NOTIFICATIONS_SERVICE_PORT:-8004}:8004"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      backend_net:
+
+  # ==========================
+  # ⚙️ Celery Worker (Procesamiento de Cola)
+  # ==========================
+  celery-worker:
+    build:
+      context: ./services/notificacion-service
+      dockerfile: Dockerfile
+    container_name: celery_worker
+    command: celery -A celery_config worker --loglevel=info --concurrency=2
+    env_file:
+      - .env
+    environment:
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply@sistema.com}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Sistema de Reservas}
+      SMTP_TLS: ${SMTP_TLS:-true}
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/0"
+    depends_on:
+      redis:
+        condition: service_healthy
+      notifications-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "celery", "-A", "celery_config", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      backend_net:
+
+  # ==========================
   # 💻 Frontend (Nginx)
   # ==========================
   frontend:
@@ -224,6 +324,7 @@ services:
       - auth-service
       - reservations-service
       - documents-service
+      - notifications-service
     restart: unless-stopped
     networks:
       - frontend_net
@@ -237,6 +338,7 @@ volumes:
   reservations_db_data:
   documents_db_data:
   minio_data:
+  redis_data:
 
 # ==========================
 # Redes

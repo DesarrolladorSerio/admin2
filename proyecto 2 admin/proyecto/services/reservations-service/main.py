@@ -6,6 +6,8 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, date
 from sqlmodel import Session
+import httpx
+import logging
 from db_reservas import (
     create_db_and_tables,
     get_session,
@@ -17,6 +19,10 @@ from db_reservas import (
     get_reservations_by_date_range,
     Reservation
 )
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # CONFIGURACIÓN DE AUTENTICACIÓN
@@ -41,8 +47,13 @@ app.add_middleware(
 # =============================================================================
 
 class TokenData(BaseModel):
-    username: str
+    username: str  # Este campo contiene el email del usuario
     user_id: int
+    
+    @property
+    def email(self):
+        """Alias para obtener el email (username es el email)"""
+        return self.username
 
 def get_current_user_data_from_token(token: str = Depends(oauth2_scheme)) -> TokenData:
     credentials_exception = HTTPException(
@@ -99,6 +110,27 @@ def on_startup():
     print("✅ Base de datos de reservaciones inicializada")
 
 # =============================================================================
+# FUNCIONES AUXILIARES PARA NOTIFICACIONES
+# =============================================================================
+
+async def send_notification(endpoint: str, data: dict):
+    """
+    Enviar notificación al servicio de notificaciones
+    No bloquea si falla, solo registra el error
+    """
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                f"http://notifications-service:8004/api/notifications/{endpoint}",
+                json=data
+            )
+            logger.info(f"Notificación enviada: {endpoint} - Status: {response.status_code}")
+            return response.json()
+    except Exception as e:
+        logger.error(f"Error enviando notificación a {endpoint}: {str(e)}")
+        return None
+
+# =============================================================================
 # ENDPOINTS
 # =============================================================================
 
@@ -107,7 +139,7 @@ def health_check():
     return {"status": "ok", "service": "reservations"}
 
 @app.post("/reservations", response_model=ReservationResponse)
-def create_new_reservation(
+async def create_new_reservation(
     reservation_data: ReservationCreate,
     session: Session = Depends(get_session),
     current_user: TokenData = Depends(get_current_user_data_from_token)
@@ -129,6 +161,23 @@ def create_new_reservation(
     
     try:
         new_reservation = create_reservation(session, reservation_data)
+        
+        # Enviar notificación de confirmación (asíncrono, no bloquea)
+        await send_notification(
+            "reservation/confirmation",
+            {
+                "user_email": current_user.email,  # Email extraído del token JWT
+                "user_name": reservation_data.usuario_nombre,
+                "reservation_data": {
+                    "id": new_reservation.id,
+                    "date": str(new_reservation.fecha),
+                    "time": new_reservation.hora,
+                    "service": new_reservation.tipo_tramite,
+                    "location": "Oficina Principal"  # Puedes parametrizar esto
+                }
+            }
+        )
+        
         return new_reservation
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -186,7 +235,7 @@ def update_reservation_endpoint(
     return updated_reservation
 
 @app.delete("/reservations/{reservation_id}")
-def delete_reservation_endpoint(
+async def delete_reservation_endpoint(
     reservation_id: int,
     session: Session = Depends(get_session),
     current_user: TokenData = Depends(get_current_user_data_from_token)
@@ -202,9 +251,29 @@ def delete_reservation_endpoint(
             detail="No tienes permiso para eliminar esta reservación."
         )
 
+    # Guardar datos para notificación antes de eliminar
+    reservation_data = {
+        "id": reservation_to_delete.id,
+        "date": str(reservation_to_delete.fecha),
+        "time": reservation_to_delete.hora,
+        "service": reservation_to_delete.tipo_tramite
+    }
+    user_name = reservation_to_delete.usuario_nombre
+
     success = delete_reservation(session, reservation_id)
     if not success:
         raise HTTPException(status_code=404, detail="Reservación no encontrada durante la eliminación")
+    
+    # Enviar notificación de cancelación
+    await send_notification(
+        "reservation/cancellation",
+        {
+            "user_email": current_user.email,  # Email extraído del token JWT
+            "user_name": user_name,
+            "reservation_data": reservation_data
+        }
+    )
+    
     return {"message": "Reservación eliminada exitosamente"}
 
 @app.get("/reservations/calendar/{start_date}/{end_date}", response_model=List[ReservationResponse])

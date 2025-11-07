@@ -5,6 +5,8 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from pydantic import BaseModel, EmailStr, constr
 from sqlmodel import Session
+import httpx
+import logging
 
 # Importar funciones de base de datos
 from db_auth import (
@@ -19,6 +21,10 @@ from db_auth import (
     create_user,
     User
 )
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # CONFIGURACIÓN
@@ -124,6 +130,27 @@ def on_startup():
         init_default_users(session)
 
 # =============================================================================
+# FUNCIONES AUXILIARES PARA NOTIFICACIONES
+# =============================================================================
+
+async def send_notification(endpoint: str, data: dict):
+    """
+    Enviar notificación al servicio de notificaciones
+    No bloquea si falla, solo registra el error
+    """
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                f"http://notifications-service:8004/api/notifications/{endpoint}",
+                json=data
+            )
+            logger.info(f"Notificación enviada: {endpoint} - Status: {response.status_code}")
+            return response.json()
+    except Exception as e:
+        logger.error(f"Error enviando notificación a {endpoint}: {str(e)}")
+        return None
+
+# =============================================================================
 # ENDPOINTS DE LA API
 # =============================================================================
 
@@ -148,7 +175,7 @@ async def login_for_access_token(
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/register", response_model=Token)
-def register_user(
+async def register_user(
     user_data: UserCreate,
     session: Session = Depends(get_session)
 ):
@@ -186,6 +213,16 @@ def register_user(
         nombre=user_data.nombre,
         password=user_data.password,
         rut=user_data.rut
+    )
+    
+    # 📧 Enviar email de bienvenida (asíncrono, no bloquea)
+    await send_notification(
+        "welcome",
+        {
+            "user_email": new_user.email,
+            "user_name": new_user.nombre,
+            "temp_password": None  # No enviamos la contraseña por email
+        }
     )
     
     # Crear token automáticamente
@@ -241,6 +278,115 @@ def get_user_by_id(user_id: int, session: Session = Depends(get_session)):
         nombre=user.nombre,
         rut=user.rut
     )
+
+# =============================================================================
+# ENDPOINTS DE RECUPERACIÓN DE CONTRASEÑA
+# =============================================================================
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    new_password: str
+
+@app.post("/password-reset/request")
+async def request_password_reset(
+    reset_data: PasswordResetRequest,
+    session: Session = Depends(get_session)
+):
+    """Solicita un token para restablecer la contraseña."""
+    
+    # Buscar usuario por email
+    user = get_user_by_email(session, reset_data.email)
+    
+    # Por seguridad, siempre devolver éxito aunque el email no exista
+    # Esto evita que se puedan enumerar emails válidos
+    if not user:
+        logger.warning(f"Intento de recuperación para email inexistente: {reset_data.email}")
+        return {"message": "Si el email existe, se enviará un enlace de recuperación"}
+    
+    # Generar token temporal (válido por 1 hora)
+    reset_token_expires = timedelta(hours=1)
+    reset_token = create_access_token(
+        data={
+            "sub": user.email,
+            "user_id": user.id,
+            "purpose": "password_reset"
+        },
+        expires_delta=reset_token_expires
+    )
+    
+    # 📧 Enviar email de recuperación
+    await send_notification(
+        "password-reset",
+        {
+            "user_email": user.email,
+            "user_name": user.nombre,
+            "reset_token": reset_token,
+            "reset_url": "http://localhost/reset-password"  # URL del frontend
+        }
+    )
+    
+    logger.info(f"Email de recuperación enviado a: {user.email}")
+    
+    return {"message": "Si el email existe, se enviará un enlace de recuperación"}
+
+@app.post("/password-reset/confirm")
+async def confirm_password_reset(
+    reset_data: PasswordResetConfirm,
+    session: Session = Depends(get_session)
+):
+    """Confirma el restablecimiento de contraseña con el token."""
+    
+    # Validar longitud de contraseña
+    if len(reset_data.new_password) < 8:
+        raise HTTPException(
+            status_code=400,
+            detail="La contraseña debe tener al menos 8 caracteres"
+        )
+    
+    # Verificar token
+    try:
+        payload = jwt.decode(reset_data.token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        purpose: str = payload.get("purpose")
+        
+        if purpose != "password_reset":
+            raise HTTPException(
+                status_code=400,
+                detail="Token inválido"
+            )
+        
+        if email is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Token inválido"
+            )
+    except JWTError:
+        raise HTTPException(
+            status_code=400,
+            detail="Token expirado o inválido"
+        )
+    
+    # Buscar usuario
+    user = get_user_by_email(session, email)
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="Usuario no encontrado"
+        )
+    
+    # Actualizar contraseña
+    from passlib.context import CryptContext
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    user.hashed_password = pwd_context.hash(reset_data.new_password)
+    session.add(user)
+    session.commit()
+    
+    logger.info(f"Contraseña restablecida para: {user.email}")
+    
+    return {"message": "Contraseña restablecida exitosamente"}
 
 @app.get("/health")
 def health_check():

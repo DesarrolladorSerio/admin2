@@ -38,7 +38,7 @@ export default function Reservas() {
       const newReservation = await reservationAPI.createReservation(reservationData);
       setReservations([...reservations, newReservation]);
       setView('calendar');
-      alert('✅ Reservación creada exitosamente');
+      alert('✅ Reservación creada exitosamente.\n📧 Se ha enviado un email de confirmación.');
     } catch (error) {
       console.error('Error creating reservation:', error);
       const errorMessage = error.response?.data?.detail || 'Error al crear reservación';
@@ -68,7 +68,7 @@ export default function Reservas() {
     try {
       await reservationAPI.deleteReservation(id);
       setReservations(reservations.filter(r => r.id !== id));
-      alert('✅ Reservación eliminada exitosamente');
+      alert('✅ Reservación eliminada exitosamente.\n📧 Se ha enviado una notificación de cancelación.');
     } catch (error) {
       console.error('Error deleting reservation:', error);
       alert('❌ Error al eliminar reservación');

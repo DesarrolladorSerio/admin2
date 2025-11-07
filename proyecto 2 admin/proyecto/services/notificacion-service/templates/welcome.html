@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bienvenido</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: #4F46E5;
+            color: white;
+            padding: 30px;
+            text-align: center;
+            border-radius: 5px 5px 0 0;
+        }
+        .content {
+            background-color: #f9f9f9;
+            padding: 30px;
+            border: 1px solid #ddd;
+        }
+        .credentials-box {
+            background-color: #EEF2FF;
+            border: 2px solid #4F46E5;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #777;
+            font-size: 12px;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 30px;
+            background-color: #4F46E5;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎉 ¡Bienvenido!</h1>
+    </div>
+    
+    <div class="content">
+        <p>Hola <strong>{{ user_name }}</strong>,</p>
+        
+        <p>¡Bienvenido al Sistema de Reservas! Tu cuenta ha sido creada exitosamente.</p>
+        
+        <div class="credentials-box">
+            <h3>📧 Tus credenciales de acceso:</h3>
+            <p><strong>Usuario:</strong> {{ user_email }}</p>
+            {% if temp_password %}
+            <p><strong>Contraseña temporal:</strong> {{ temp_password }}</p>
+            <p style="color: #EF4444;"><strong>⚠️ Importante:</strong> Por seguridad, te recomendamos cambiar tu contraseña al iniciar sesión por primera vez.</p>
+            {% endif %}
+        </div>
+        
+        <p><strong>Con tu cuenta podrás:</strong></p>
+        <ul>
+            <li>Realizar reservas de manera rápida y sencilla</li>
+            <li>Gestionar tus documentos</li>
+            <li>Ver el historial de tus reservas</li>
+            <li>Recibir notificaciones y recordatorios</li>
+        </ul>
+        
+        <p>Si tienes alguna pregunta o necesitas ayuda, no dudes en contactarnos.</p>
+        
+        <p>¡Esperamos que disfrutes de nuestros servicios!</p>
+        
+        <p>Saludos cordiales,<br>
+        <strong>Equipo del Sistema de Reservas</strong></p>
+    </div>
+    
+    <div class="footer">
+        <p>Este es un correo automático, por favor no respondas a este mensaje.</p>
+        <p>&copy; 2025 Sistema de Reservas. Todos los derechos reservados.</p>
+    </div>
+</body>
+</html>
