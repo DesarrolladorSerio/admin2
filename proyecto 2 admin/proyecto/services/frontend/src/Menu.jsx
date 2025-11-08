@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import authAPI from "./services/authAPI";
 
@@ -57,52 +57,119 @@ export default function Menu() {
                 <p><strong>📧 Email:</strong> {currentUser?.email}</p>
                 {currentUser?.rut && <p><strong>🆔 RUT:</strong> {currentUser.rut}</p>}
             </div>
-            <p style={{ marginTop: '20px' }}>
-                <button
-                    onClick={() => navigate('/reservas')}
-                    style={{
-                        padding: '12px 20px',
-                        background: '#007bff',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: 6,
-                        marginRight: '10px',
-                        fontSize: '16px',
-                        cursor: 'pointer'
-                    }}
+            {/* Principio de Responsabilidad Única: Separamos las opciones por tipo de usuario */}
+            <MenuOptions
+                userRole={currentUser?.role}
+                onNavigate={navigate}
+                onLogout={handleLogout}
+            />
+        </div>
+    );
+}
+
+// Principio de Responsabilidad Única: Componente especializado en mostrar opciones de menú
+function MenuOptions({ userRole, onNavigate, onLogout }) {
+    // Principio de Composición: Crear un botón reutilizable
+    const MenuButton = ({ onClick, background, children, isAdmin = false }) => {
+        // Principio de Principio Abierto/Cerrado: Solo mostrar botones de admin si el usuario es admin
+        if (isAdmin && userRole !== 'admin') {
+            return null;
+        }
+
+        return (
+            <button
+                onClick={onClick}
+                style={{
+                    padding: '12px 20px',
+                    background,
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 6,
+                    marginRight: '10px',
+                    marginBottom: '10px',
+                    fontSize: '16px',
+                    cursor: 'pointer',
+                    display: 'inline-block'
+                }}
+            >
+                {children}
+            </button>
+        );
+    };
+
+    return (
+        <div style={{ marginTop: '20px' }}>
+            {/* Opciones disponibles para todos los usuarios */}
+            <MenuButton
+                onClick={() => onNavigate('/reservas')}
+                background="#007bff"
+            >
+                📅 Ir a Reservas
+            </MenuButton>
+
+            {/* Gestión avanzada de reservas para admin/empleados */}
+            {(userRole === 'admin' || userRole === 'employee') && (
+                <MenuButton
+                    onClick={() => onNavigate('/admin/reservas')}
+                    background="#17a2b8"
                 >
-                    📅 Ir a Reservas
-                </button>
-                <button
-                    onClick={() => navigate('/documentos')}
-                    style={{
-                        padding: '12px 20px',
-                        background: '#28a745',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: 6,
-                        marginRight: '10px',
-                        fontSize: '16px',
-                        cursor: 'pointer'
-                    }}
-                >
-                    📄 Documentos
-                </button>
-                <button
-                    onClick={handleLogout}
-                    style={{
-                        padding: '12px 20px',
-                        background: '#dc3545',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: 6,
-                        fontSize: '16px',
-                        cursor: 'pointer'
-                    }}
-                >
-                    🚪 Cerrar Sesión
-                </button>
-            </p>
+                    🔧 Gestionar Todas las Reservas
+                </MenuButton>
+            )}
+
+            <MenuButton
+                onClick={() => onNavigate('/documentos')}
+                background="#28a745"
+            >
+                📄 Documentos
+            </MenuButton>
+
+            {/* Principio de Segregación de Interfaces: Opciones específicas para administradores */}
+            <MenuButton
+                onClick={() => onNavigate('/admin/register-employee')}
+                background="#6f42c1"
+                isAdmin={true}
+            >
+                👥 Registrar Empleado
+            </MenuButton>
+
+            <MenuButton
+                onClick={() => onNavigate('/admin/reports')}
+                background="#fd7e14"
+                isAdmin={true}
+            >
+                📊 Reportes
+            </MenuButton>
+
+            <MenuButton
+                onClick={() => onNavigate('/admin/users')}
+                background="#20c997"
+                isAdmin={true}
+            >
+                👤 Gestionar Usuarios
+            </MenuButton>
+
+            {/* Opción de cerrar sesión (disponible para todos) */}
+            <MenuButton
+                onClick={onLogout}
+                background="#dc3545"
+            >
+                🚪 Cerrar Sesión
+            </MenuButton>
+
+            {/* Indicador visual del rol del usuario */}
+            {userRole === 'admin' && (
+                <div style={{
+                    marginTop: '20px',
+                    padding: '10px',
+                    background: '#e7f3ff',
+                    border: '1px solid #b3d7ff',
+                    borderRadius: '4px',
+                    fontSize: '14px'
+                }}>
+                    🔐 <strong>Panel de Administración Activo</strong>
+                </div>
+            )}
         </div>
     );
 }

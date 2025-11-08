@@ -1,20 +1,21 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks, status
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, EmailStr
-from typing import List, Optional, Dict, Any
 import logging
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 import redis
 from config import settings
+from fastapi import FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, EmailStr
 from tasks import (
+    send_batch_emails_task,
+    send_document_notification_task,
     send_email_task,
+    send_password_reset_task,
+    send_reservation_cancellation_task,
     send_reservation_confirmation_task,
     send_reservation_reminder_task,
-    send_reservation_cancellation_task,
-    send_document_notification_task,
     send_welcome_email_task,
-    send_password_reset_task,
-    send_batch_emails_task
 )
 
 # Configurar logging
@@ -426,8 +427,9 @@ async def get_stats():
                 redis_client.ping()
                 stats["redis_connected"] = True
                 # Aquí podrías agregar más estadísticas de Redis/Celery
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"Redis connection error: {e}")
+                stats["redis_connected"] = False
         
         return stats
     

@@ -1,7 +1,8 @@
+import logging
+from typing import Any, Dict, List
+
 from celery_config import celery_app
 from email_service import email_service
-from typing import Dict, Any, List
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -12,9 +13,9 @@ def send_email_task(
     to_emails: List[str],
     subject: str,
     html_body: str,
-    text_body: str = None,
-    cc: List[str] = None,
-    bcc: List[str] = None
+    text_body: str | None = None,
+    cc: List[str] | None = None,
+    bcc: List[str] | None = None
 ):
     """
     Tarea asíncrona para enviar email
@@ -176,7 +177,7 @@ def send_welcome_email_task(
     self,
     user_email: str,
     user_name: str,
-    temp_password: str = None
+    temp_password: str | None = None
 ):
     """
     Tarea asíncrona para enviar email de bienvenida

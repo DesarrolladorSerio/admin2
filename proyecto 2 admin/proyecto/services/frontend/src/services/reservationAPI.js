@@ -57,6 +57,12 @@ class ReservationAPI {
     const response = await apiClient.get(`/check-availability/${fecha}/${hora}/${tipoTramite}${params}`);
     return response.data;
   }
+
+  // Método específico para admin/empleados
+  async getAllReservationsDetailed() {
+    const response = await apiClient.get('/admin/reservations');
+    return response.data;
+  }
 }
 
 export default new ReservationAPI();

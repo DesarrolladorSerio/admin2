@@ -50,6 +50,10 @@ class AuthAPI {
 
   async register(userData) {
     try {
+      const userDataWithRole = {
+        ...userData,
+        rool: "user"
+      }
       // userData debe contener: { email, nombre, rut, password }
       const response = await authClient.post('/register', userData);
       if (response.data.access_token) {
@@ -90,6 +94,22 @@ class AuthAPI {
       console.error('Error fetching users:', error);
       throw error;
     }
+  }
+
+  // Principio de Responsabilidad Única: función especializada para registro de empleados
+  async registerEmployee(employeeData) {
+    try {
+      const response = await authClient.post('/admin/employees', employeeData);
+      return response.data;
+    } catch (error) {
+      console.error('Error registering employee:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  // Función para obtener el token (útil para llamadas directas)
+  getToken() {
+    return localStorage.getItem('authToken');
   }
 }
 

@@ -1,16 +1,25 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, status, Header
-from fastapi.responses import StreamingResponse
-from fastapi.middleware.cors import CORSMiddleware
-import os
-from typing import List, Optional
 import io
-from datetime import datetime
 import json
-import httpx
 import logging
+from datetime import datetime
+from typing import Optional
 
-from db_documents import documents_db, DocumentType, Document
-from storage_service import storage, validate_file_type, calculate_file_checksum
+import httpx
+from auth_utils import get_current_user
+from db_documents import documents_db
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    UploadFile,
+    status,
+)
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from storage_service import storage, validate_file_type
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -39,7 +48,7 @@ async def send_notification(notification_type: str, recipient_email: str, data: 
     """Envía notificación al servicio de notificaciones de forma no bloqueante"""
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.post(
+            await client.post(
                 "http://notifications-service:8004/notifications/send",
                 json={
                     "notification_type": notification_type,
@@ -127,13 +136,14 @@ async def upload_document(
     description: Optional[str] = Form(None),
     tags: Optional[str] = Form(None),
     is_public: bool = Form(False),
-    user_id: Optional[int] = Header(default=2, alias="x-user-id"),
-    user_email: Optional[str] = Header(default=None, alias="x-user-email")
+    current_user: dict = Depends(get_current_user)
 ):
-    """Subir un nuevo documento al sistema"""
-    # Si no viene user_id, usar 2 por defecto
-    if user_id is None:
-        user_id = 2
+    """
+    Subir un nuevo documento al sistema
+    Requiere autenticación JWT válida
+    """
+    user_id = current_user["id"]
+    user_email = current_user["email"]
     
     try:
         # Validar tipo de documento
@@ -256,11 +266,9 @@ async def upload_document(
         )
 
 @app.get("/my-documents")
-async def get_my_documents(user_id: Optional[int] = Header(default=2, alias="x-user-id")):
+async def get_my_documents(current_user: dict = Depends(get_current_user)):
     """Obtener todos los documentos del usuario actual"""
-    # Si no viene user_id, usar 2 por defecto
-    if user_id is None:
-        user_id = 2
+    user_id = current_user["id"]
     
     try:
         documents = documents_db.get_user_documents(user_id)
@@ -525,7 +533,7 @@ async def startup_event():
         
         print("✅ Servicio de Documentos iniciado correctamente")
         print(f"📊 Bucket MinIO: {storage.bucket_name}")
-        print(f"🗄️ Base de datos: Inicializada")
+        print("🗄️ Base de datos: Inicializada")
         
     except Exception as e:
         print(f"❌ Error iniciando servicio: {e}")

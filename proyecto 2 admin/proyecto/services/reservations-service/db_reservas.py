@@ -1,7 +1,8 @@
 import os
-from sqlmodel import SQLModel, Field, create_engine, Session, select
+from datetime import date, datetime
 from typing import Optional
-from datetime import datetime, date
+
+from sqlmodel import Field, Session, SQLModel, create_engine, select
 
 # Configuración de base de datos
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg://reservations_user:reservations_password_2024@localhost:5433/reservations_db")
@@ -52,6 +53,15 @@ def create_reservation(session: Session, reservation_data):
 
 def get_all_reservations(session: Session):
     reservations = session.exec(select(Reservation).where(Reservation.estado != "cancelada")).all()
+    return reservations
+
+def get_reservations_by_user(session: Session, user_id: int):
+    """Obtiene todas las reservas de un usuario específico"""
+    reservations = session.exec(
+        select(Reservation)
+        .where(Reservation.usuario_id == user_id)
+        .where(Reservation.estado != "cancelada")
+    ).all()
     return reservations
 
 def get_reservation_by_id(session: Session, reservation_id: int):
@@ -105,7 +115,7 @@ def get_duration_by_tramite(tipo_tramite: str) -> int:
     }
     return duraciones.get(tipo_tramite, 30)  # Default 30 minutos
 
-def check_time_conflict(session: Session, fecha: date, hora: str, tipo_tramite: str, exclude_reservation_id: int = None):
+def check_time_conflict(session: Session, fecha: date, hora: str, tipo_tramite: str, exclude_reservation_id: Optional[int] = None):
     """
     Verifica si hay conflictos de horario para una nueva reserva
     

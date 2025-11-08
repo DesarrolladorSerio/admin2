@@ -1,26 +1,28 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
-from datetime import datetime, timedelta
-from pydantic import BaseModel, EmailStr, constr
-from sqlmodel import Session
-import httpx
 import logging
+from datetime import datetime, timedelta
+
+import httpx
+from auth_utils import UserRole, require_role
 
 # Importar funciones de base de datos
 from db_auth import (
-    create_db_and_tables, 
-    get_session, 
+    EmployeeInfo,
+    User,
     authenticate_user,
-    init_default_users,
-    get_user_by_username,
+    create_db_and_tables,
+    create_user,
+    get_session,
     get_user_by_email,
     get_user_by_rut,
-    get_user_by_login_identifier,
-    create_user,
-    User
+    get_user_by_username,
+    init_default_users,
 )
+from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
+from pydantic import BaseModel, EmailStr
+from sqlmodel import Session
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -65,12 +67,23 @@ class UserResponse(BaseModel):
     username: str  # Mantener para compatibilidad
     email: str
     nombre: str
-    rut: str | None
+    rut: str
+    role: str  # Corregido de 'rool' a 'role'
 
 class Token(BaseModel):
     access_token: str
     token_type: str
 
+class EmployeeCreate(BaseModel):
+    email: EmailStr
+    nombre: str
+    rut: str
+    password: str
+    cargo: str
+    departamento: str
+    fecha_ingreso: str
+    tipo_contrato: str = "planta"  # planta, contrata, honorarios
+    
 # =============================================================================
 # FUNCIONES DE AUTENTICACIÓN
 # =============================================================================
@@ -95,12 +108,15 @@ def verify_token(token: str = Depends(oauth2_scheme)):
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
+        username = payload.get("sub")
+        user_id = payload.get("user_id")
+        
+        if not isinstance(username, str) or not isinstance(user_id, int):
             raise credentials_exception
+            
+        return {"username": username, "user_id": user_id}
     except JWTError:
         raise credentials_exception
-    return username
 
 def get_current_user(
     username: str = Depends(verify_token),
@@ -160,14 +176,24 @@ async def login_for_access_token(
     session: Session = Depends(get_session)
 ):
     """Endpoint para el login con JSON. Soporta email y RUT."""
-    user = authenticate_user(session, login_data.identifier, login_data.password)
-    if not user:
+    auth_result = authenticate_user(session, login_data.identifier, login_data.password)
+    if not auth_result or isinstance(auth_result, bool):
         login_type_msg = "email" if login_data.login_type == "email" else "RUT"
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Incorrect {login_type_msg} or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    # En este punto sabemos que auth_result es un User válido
+    user: User = auth_result
+    
+    if user.id is None or user.email is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Usuario malformado en base de datos"
+        )
+    
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.email, "user_id": user.id}, expires_delta=access_token_expires
@@ -212,7 +238,7 @@ async def register_user(
         email=user_data.email,
         nombre=user_data.nombre,
         password=user_data.password,
-        rut=user_data.rut
+        rut=user_data.rut,
     )
     
     # 📧 Enviar email de bienvenida (asíncrono, no bloquea)
@@ -233,34 +259,138 @@ async def register_user(
     return {"access_token": access_token, "token_type": "bearer"}
 
 # =============================================================================
+# ENDPOINTS DE ADMINISTRACIÓN DE EMPLEADOS
+# =============================================================================
+
+@app.post("/admin/employees", response_model=UserResponse)
+async def register_employee(
+    employee_data: EmployeeCreate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_role([UserRole.ADMIN]))
+):
+    """Endpoint protegido para que administradores registren empleados municipales."""
+    
+    # Validar longitud de contraseña
+    if len(employee_data.password) < 8:
+        raise HTTPException(
+            status_code=400,
+            detail="La contraseña debe tener al menos 8 caracteres"
+        )
+    
+    # Verificar si el email ya existe
+    if get_user_by_email(session, employee_data.email):
+        raise HTTPException(
+            status_code=400,
+            detail="El email ya está registrado"
+        )
+    
+    # Verificar si el RUT ya existe
+    if get_user_by_rut(session, employee_data.rut):
+        raise HTTPException(
+            status_code=400,
+            detail="El RUT ya está registrado"
+        )
+    
+    # Crear nuevo empleado
+    new_employee = create_user(
+        session,
+        username=employee_data.email,
+        email=employee_data.email,
+        nombre=employee_data.nombre,
+        password=employee_data.password,
+        rut=employee_data.rut,
+        role="employee"
+    )
+    
+    # Verificar que los IDs existan
+    if new_employee.id is None or current_user.id is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al crear empleado"
+        )
+    
+    # Registrar información adicional del empleado
+    employee_info = EmployeeInfo(
+        user_id=new_employee.id,
+        cargo=employee_data.cargo,
+        departamento=employee_data.departamento,
+        fecha_ingreso=employee_data.fecha_ingreso,
+        tipo_contrato=employee_data.tipo_contrato,
+        registrado_por=current_user.id
+    )
+    session.add(employee_info)
+    session.commit()
+    
+    # 📧 Enviar email de bienvenida al empleado
+    await send_notification(
+        "employee-welcome",
+        {
+            "user_email": new_employee.email,
+            "user_name": new_employee.nombre,
+            "cargo": employee_data.cargo,
+            "departamento": employee_data.departamento,
+            "fecha_ingreso": employee_data.fecha_ingreso
+        }
+    )
+    
+    return UserResponse(
+        id=new_employee.id,
+        username=new_employee.username,
+        email=new_employee.email,
+        nombre=new_employee.nombre,
+        rut=new_employee.rut,
+        role=new_employee.role
+    )
+
+# =============================================================================
 # ENDPOINTS DE USUARIOS (para consulta desde otros servicios)
 # =============================================================================
 
 @app.get("/users/me", response_model=UserResponse)
 def get_current_user_info(current_user: User = Depends(get_current_user)):
     """Obtiene la información del usuario autenticado actual."""
+    if current_user.id is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Usuario sin ID válido"
+        )
     return UserResponse(
-        id=current_user.id, 
+        id=current_user.id,
         username=current_user.username,
         email=current_user.email,
         nombre=current_user.nombre,
-        rut=current_user.rut
+        rut=current_user.rut,
+        role=current_user.role
     )
 
 @app.get("/users", response_model=list[UserResponse])
-def get_all_users(session: Session = Depends(get_session)):
-    """Obtiene todos los usuarios registrados."""
+def get_all_users(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Obtiene todos los usuarios registrados. Solo admin/empleados pueden ver la lista completa."""
+    # Verificar permisos
+    if current_user.role not in ["admin", "employee"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para ver la lista de usuarios"
+        )
+    
     from sqlmodel import select
-    statement = select(User)
+    statement = select(User).where((User.role == "user") | (User.role == "usuario"))  # Solo usuarios normales
     users = session.exec(statement).all()
+    
     return [
         UserResponse(
-            id=user.id, 
+            id=user.id if user.id is not None else 0,
             username=user.username,
             email=user.email,
             nombre=user.nombre,
-            rut=user.rut
-        ) for user in users
+            rut=user.rut,
+            role=user.role
+        )
+        for user in users
+        if user.id is not None and user.nombre  # Solo usuarios con nombre válido
     ]
 
 @app.get("/users/{user_id}", response_model=UserResponse)
@@ -271,12 +401,45 @@ def get_user_by_id(user_id: int, session: Session = Depends(get_session)):
     user = session.exec(statement).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if user.id is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Usuario sin ID válido"
+        )
+    
     return UserResponse(
-        id=user.id, 
+        id=user.id,
         username=user.username,
         email=user.email,
         nombre=user.nombre,
-        rut=user.rut
+        rut=user.rut,
+        role=user.role
+    )
+
+@app.get("/verify-user/{user_id}", response_model=UserResponse)
+def verify_user_exists(
+    user_id: int, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Verifica que un usuario existe y retorna información básica (para otros servicios)."""
+    from sqlmodel import select
+    statement = select(User).where(User.id == user_id)
+    user = session.exec(statement).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if user.id is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Usuario sin ID válido"
+        )
+    return UserResponse(
+        id=user.id,
+        username=user.username,
+        email=user.email,
+        nombre=user.nombre,
+        rut=user.rut,
+        role=user.role
     )
 
 # =============================================================================
@@ -349,16 +512,16 @@ async def confirm_password_reset(
     # Verificar token
     try:
         payload = jwt.decode(reset_data.token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        purpose: str = payload.get("purpose")
+        email = payload.get("sub")
+        purpose = payload.get("purpose")
         
-        if purpose != "password_reset":
+        if not isinstance(email, str) or not isinstance(purpose, str):
             raise HTTPException(
                 status_code=400,
                 detail="Token inválido"
             )
         
-        if email is None:
+        if purpose != "password_reset":
             raise HTTPException(
                 status_code=400,
                 detail="Token inválido"

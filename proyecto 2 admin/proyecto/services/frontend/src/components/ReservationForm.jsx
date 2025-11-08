@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import authAPI from '../services/authAPI';
 import reservationAPI from '../services/reservationAPI';
 
 export default function ReservationForm({
@@ -11,12 +12,19 @@ export default function ReservationForm({
     fecha: '',
     hora: '',
     tipo_tramite: '',
-    descripcion: ''
+    descripcion: '',
+    selectedUserId: null, // Para admin/empleados: usuario seleccionado
+    selectedUserName: ''  // Para admin/empleados: nombre del usuario seleccionado
   });
 
   const [tiposTramites, setTiposTramites] = useState([]);
+  const [availableUsers, setAvailableUsers] = useState([]); // Lista de usuarios para admin/empleados
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const [availabilityStatus, setAvailabilityStatus] = useState(null);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
+
+  // Determinar si el usuario actual puede crear reservas para otros
+  const isAdminOrEmployee = currentUser && ['admin', 'employee'].includes(currentUser.role);
 
   useEffect(() => {
     // Cargar tipos de trámites
@@ -29,7 +37,23 @@ export default function ReservationForm({
       }
     };
 
+    // Cargar usuarios disponibles para admin/empleados
+    const loadAvailableUsers = async () => {
+      if (isAdminOrEmployee) {
+        setLoadingUsers(true);
+        try {
+          const users = await authAPI.getUsers();
+          setAvailableUsers(users);
+        } catch (error) {
+          console.error('Error cargando usuarios:', error);
+        } finally {
+          setLoadingUsers(false);
+        }
+      }
+    };
+
     loadTiposTramites();
+    loadAvailableUsers();
 
     if (editingReservation) {
       // Si estamos editando, llenamos el formulario con los datos existentes
@@ -37,7 +61,9 @@ export default function ReservationForm({
         fecha: editingReservation.fecha,
         hora: editingReservation.hora.slice(0, 5), // Formato HH:MM
         tipo_tramite: editingReservation.tipo_tramite || '',
-        descripcion: editingReservation.descripcion
+        descripcion: editingReservation.descripcion,
+        selectedUserId: editingReservation.usuario_id,
+        selectedUserName: editingReservation.usuario_nombre
       });
     } else {
       // Si es una nueva reserva, usamos valores por defecto
@@ -47,10 +73,12 @@ export default function ReservationForm({
         fecha: today,
         hora: now,
         tipo_tramite: '',
-        descripcion: ''
+        descripcion: '',
+        selectedUserId: isAdminOrEmployee ? null : currentUser?.id,
+        selectedUserName: isAdminOrEmployee ? '' : (currentUser?.nombre || currentUser?.username || '')
       });
     }
-  }, [editingReservation]);
+  }, [editingReservation, currentUser, isAdminOrEmployee]);
 
   // Función para verificar disponibilidad
   const checkAvailability = async (fecha, hora, tipoTramite) => {
@@ -95,12 +123,23 @@ export default function ReservationForm({
       return;
     }
 
-    // Añadir siempre los datos del usuario actual al enviar
+    // Validar que se haya seleccionado un usuario (para admin/empleados)
+    if (isAdminOrEmployee && !formData.selectedUserId) {
+      alert('❌ Por favor selecciona un usuario para la reserva');
+      return;
+    }
+
+    // Preparar datos para enviar
+    const finalUserId = isAdminOrEmployee ? formData.selectedUserId : currentUser.id;
+    const finalUserName = isAdminOrEmployee ? formData.selectedUserName : (currentUser.nombre || currentUser.username);
+
     const submitData = {
-      ...formData,
+      fecha: formData.fecha,
       hora: formData.hora + ':00', // Agregar segundos
-      usuario_id: currentUser.id,
-      usuario_nombre: currentUser.nombre || currentUser.username // Usar nombre completo si está disponible
+      tipo_tramite: formData.tipo_tramite,
+      descripcion: formData.descripcion,
+      usuario_id: finalUserId,
+      usuario_nombre: finalUserName
     };
 
     onSubmit(submitData);
@@ -119,21 +158,55 @@ export default function ReservationForm({
         backgroundColor: 'white'
       }}>
 
-        {/* 👤 Muestra del Usuario Autenticado */}
+        {/* 👤 Selección de Usuario */}
         <div style={{ marginBottom: '15px' }}>
           <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-            👤 Usuario:
+            👤 {isAdminOrEmployee ? 'Seleccionar Usuario: *' : 'Usuario:'}
           </label>
-          <p style={{
-            width: '100%',
-            padding: '10px',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-            fontSize: '14px',
-            backgroundColor: '#e9ecef'
-          }}>
-            {currentUser ? currentUser.username : 'Cargando...'}
-          </p>
+
+          {isAdminOrEmployee ? (
+            // Dropdown para admin/empleados
+            <select
+              value={formData.selectedUserId || ''}
+              onChange={(e) => {
+                const selectedUser = availableUsers.find(user => user.id == e.target.value);
+                setFormData({
+                  ...formData,
+                  selectedUserId: parseInt(e.target.value),
+                  selectedUserName: selectedUser ? selectedUser.nombre : ''
+                });
+              }}
+              required
+              style={{
+                width: '100%',
+                padding: '10px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '14px'
+              }}
+            >
+              <option value="">
+                {loadingUsers ? 'Cargando usuarios...' : 'Selecciona un usuario'}
+              </option>
+              {availableUsers.map(user => (
+                <option key={user.id} value={user.id}>
+                  {user.nombre} ({user.email})
+                </option>
+              ))}
+            </select>
+          ) : (
+            // Campo fijo para usuarios normales
+            <p style={{
+              width: '100%',
+              padding: '10px',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              fontSize: '14px',
+              backgroundColor: '#e9ecef'
+            }}>
+              {currentUser ? (currentUser.nombre || currentUser.username) : 'Cargando...'}
+            </p>
+          )}
         </div>
 
         {/* 📅 Fecha */}

@@ -1,35 +1,27 @@
-from fastapi import FastAPI, HTTPException, Depends, status
-from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Optional, List
-from datetime import datetime, date
-from sqlmodel import Session
-import httpx
 import logging
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional
+
+import httpx
+from auth_utils import get_current_user
 from db_reservas import (
     create_db_and_tables,
-    get_session,
     create_reservation,
+    delete_reservation,
     get_all_reservations,
     get_reservation_by_id,
-    update_reservation,
-    delete_reservation,
     get_reservations_by_date_range,
-    Reservation
+    get_session,
+    update_reservation,
 )
+from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from sqlmodel import Session
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# =============================================================================
-# CONFIGURACIÓN DE AUTENTICACIÓN
-# =============================================================================
-SECRET_KEY = "un-secreto-muy-fuerte-y-largo"
-ALGORITHM = "HS256"
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
 
 app = FastAPI(title="Reservations API")
 
@@ -43,33 +35,8 @@ app.add_middleware(
 )
 
 # =============================================================================
-# MODELOS Y FUNCIONES DE AUTENTICACIÓN
+# CONFIGURACIÓN DE LA APLICACIÓN
 # =============================================================================
-
-class TokenData(BaseModel):
-    username: str  # Este campo contiene el email del usuario
-    user_id: int
-    
-    @property
-    def email(self):
-        """Alias para obtener el email (username es el email)"""
-        return self.username
-
-def get_current_user_data_from_token(token: str = Depends(oauth2_scheme)) -> TokenData:
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        user_id: int = payload.get("user_id")
-        if username is None or user_id is None:
-            raise credentials_exception
-        return TokenData(username=username, user_id=user_id)
-    except JWTError:
-        raise credentials_exception
 
 # =============================================================================
 # MODELOS DE DATOS (Pydantic)
@@ -96,6 +63,20 @@ class ReservationResponse(BaseModel):
     usuario_id: int
     usuario_nombre: str
     tipo_tramite: str  # Nuevo campo en la respuesta
+    descripcion: str
+    estado: str
+    created_at: datetime
+
+class ReservationDetailedResponse(BaseModel):
+    """Respuesta con información detallada para admin/empleados"""
+    id: int
+    fecha: date
+    hora: str
+    usuario_id: int
+    usuario_nombre: str
+    usuario_email: Optional[str] = None  # Información adicional del usuario
+    usuario_telefono: Optional[str] = None
+    tipo_tramite: str
     descripcion: str
     estado: str
     created_at: datetime
@@ -142,9 +123,9 @@ def health_check():
 async def create_new_reservation(
     reservation_data: ReservationCreate,
     session: Session = Depends(get_session),
-    current_user: TokenData = Depends(get_current_user_data_from_token)
+    current_user: Dict[str, Any] = Depends(get_current_user)
 ):
-    if reservation_data.usuario_id != current_user.user_id:
+    if reservation_data.usuario_id != current_user["id"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No puedes crear una reserva para otro usuario."
@@ -166,7 +147,7 @@ async def create_new_reservation(
         await send_notification(
             "reservation/confirmation",
             {
-                "user_email": current_user.email,  # Email extraído del token JWT
+                "user_email": current_user["email"],  # Email extraído del token JWT
                 "user_name": reservation_data.usuario_nombre,
                 "reservation_data": {
                     "id": new_reservation.id,
@@ -183,15 +164,45 @@ async def create_new_reservation(
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/reservations", response_model=List[ReservationResponse])
-def get_reservations(session: Session = Depends(get_session)):
-    reservations = get_all_reservations(session)
+def get_reservations(
+    session: Session = Depends(get_session),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Obtener reservaciones según el rol del usuario:
+    - admin/employee: Ve todas las reservas
+    - user: Ve solo sus propias reservas
+    """
+    user_role = current_user.get("role", "user")
+    
+    if user_role in ["admin", "employee"]:
+        # Admin y empleados ven todas las reservas
+        reservations = get_all_reservations(session)
+    else:
+        # Usuarios solo ven sus propias reservas
+        from db_reservas import get_reservations_by_user
+        reservations = get_reservations_by_user(session, current_user["id"])
+    
     return reservations
 
 @app.get("/reservations/{reservation_id}", response_model=ReservationResponse)
-def get_reservation(reservation_id: int, session: Session = Depends(get_session)):
+def get_reservation(
+    reservation_id: int, 
+    session: Session = Depends(get_session),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     reservation = get_reservation_by_id(session, reservation_id)
     if not reservation:
         raise HTTPException(status_code=404, detail="Reservación no encontrada")
+    
+    # Verificar permisos: admin/empleado pueden ver cualquier reserva, usuarios solo las suyas
+    user_role = current_user.get("role", "user")
+    if user_role not in ["admin", "employee"] and reservation.usuario_id != current_user["id"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para ver esta reservación."
+        )
+    
     return reservation
 
 @app.put("/reservations/{reservation_id}", response_model=ReservationResponse)
@@ -199,13 +210,15 @@ def update_reservation_endpoint(
     reservation_id: int,
     reservation_update: ReservationUpdate,
     session: Session = Depends(get_session),
-    current_user: TokenData = Depends(get_current_user_data_from_token)
+    current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     reservation = get_reservation_by_id(session, reservation_id)
     if not reservation:
         raise HTTPException(status_code=404, detail="Reservación no encontrada")
     
-    if reservation.usuario_id != current_user.user_id:
+    # Verificar permisos: admin/empleado pueden editar cualquier reserva, usuarios solo las suyas
+    user_role = current_user.get("role", "user")
+    if user_role not in ["admin", "employee"] and reservation.usuario_id != current_user["id"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permiso para editar esta reservación."
@@ -238,14 +251,16 @@ def update_reservation_endpoint(
 async def delete_reservation_endpoint(
     reservation_id: int,
     session: Session = Depends(get_session),
-    current_user: TokenData = Depends(get_current_user_data_from_token)
+    current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     reservation_to_delete = get_reservation_by_id(session, reservation_id)
 
     if not reservation_to_delete:
         raise HTTPException(status_code=404, detail="Reservación no encontrada")
 
-    if reservation_to_delete.usuario_id != current_user.user_id:
+    # Verificar permisos: admin/empleado pueden eliminar cualquier reserva, usuarios solo las suyas
+    user_role = current_user.get("role", "user")
+    if user_role not in ["admin", "employee"] and reservation_to_delete.usuario_id != current_user["id"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
             detail="No tienes permiso para eliminar esta reservación."
@@ -268,13 +283,65 @@ async def delete_reservation_endpoint(
     await send_notification(
         "reservation/cancellation",
         {
-            "user_email": current_user.email,  # Email extraído del token JWT
+            "user_email": current_user["email"],  # Email extraído del token JWT
             "user_name": user_name,
             "reservation_data": reservation_data
         }
     )
     
     return {"message": "Reservación eliminada exitosamente"}
+
+@app.get("/admin/reservations", response_model=List[ReservationDetailedResponse])
+async def get_all_reservations_detailed(
+    session: Session = Depends(get_session),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Endpoint exclusivo para admin/empleados para obtener todas las reservas con información detallada de usuarios
+    """
+    user_role = current_user.get("role", "user")
+    if user_role not in ["admin", "employee"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso denegado. Se requiere rol de administrador o empleado."
+        )
+    
+    reservations = get_all_reservations(session)
+    detailed_reservations = []
+    
+    # Enriquecer cada reserva con información del usuario desde el servicio de auth
+    for reservation in reservations:
+        detailed_reservation = ReservationDetailedResponse(
+            id=reservation.id or 0,  # Manejo del caso nullable
+            fecha=reservation.fecha,
+            hora=reservation.hora,
+            usuario_id=reservation.usuario_id,
+            usuario_nombre=reservation.usuario_nombre,
+            tipo_tramite=reservation.tipo_tramite,
+            descripcion=reservation.descripcion,
+            estado=reservation.estado,
+            created_at=reservation.created_at
+        )
+        
+        # Intentar obtener información adicional del usuario
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(
+                    f"http://auth-service:8001/api/auth/user/{reservation.usuario_id}",
+                    headers={"Authorization": f"Bearer {current_user.get('token', '')}"}
+                )
+                
+                if response.status_code == 200:
+                    user_data = response.json()
+                    detailed_reservation.usuario_email = user_data.get("email", "")
+                    # Agregar más campos si están disponibles en el servicio de auth
+                    
+        except Exception as e:
+            logger.warning(f"No se pudo obtener información del usuario {reservation.usuario_id}: {e}")
+        
+        detailed_reservations.append(detailed_reservation)
+    
+    return detailed_reservations
 
 @app.get("/reservations/calendar/{start_date}/{end_date}", response_model=List[ReservationResponse])
 def get_calendar_reservations(
