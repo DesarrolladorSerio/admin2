@@ -1,31 +1,33 @@
 # ======== Etapa de construcción ========
-FROM python:3.11.9-slim AS builder
+FROM python:3.11.9-slim
 
-LABEL maintainer="Augusto Fuenzalida" \
-    version="1.0" \
-    description="Backend FastAPI del Proyecto Redes 2025-II"
-
-# Crear usuario no root
-RUN adduser --disabled-password appuser
+LABEL maintainer="Augusto Fuenzalida <augusto@utalca.cl>" \
+      version="1.0" \
+      description="Microservicio FastAPI - reservations-service"
 
 WORKDIR /app
 
-# Instalar dependencias del sistema necesarias
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential curl && rm -rf /var/lib/apt/lists/*
-
-# Copiar archivos de dependencias
+# Copiar requirements e instalar dependencias
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
 
-# Copiar el código fuente
+# instalar herramientas necesarias para healthcheck (curl)
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends curl \
+  && rm -rf /var/lib/apt/lists/*
+
+# Copiar aplicación
 COPY . .
 
-# Cambiar al usuario no root
+# Crear usuario no-root y ajustar permisos
+RUN useradd -m appuser && chown -R appuser /app
 USER appuser
 
-# Exponer el puerto de FastAPI
-EXPOSE 8000
+ENV PORT=8000
+EXPOSE ${PORT}
 
-# Comando de arranque
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=5 \
+  CMD ["sh", "-c", "curl -f http://localhost:${PORT}/health || exit 1"]
+
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT}"]

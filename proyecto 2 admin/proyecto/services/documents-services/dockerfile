@@ -1,45 +1,42 @@
-FROM python:3.11-slim
+FROM python:3.11.9-slim
 
-# Instalar dependencias del sistema necesarias para MinIO y validación de archivos
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    libmagic1 \
-    libmagic-dev \
-    curl \
-    wget \
-    file \
+LABEL maintainer="Augusto Fuenzalida <augusto@utalca.cl>" \
+      version="1.0" \
+      description="Microservicio FastAPI - documents-service"
+
+# Instalar dependencias del sistema necesarias (minimizar capas y limpiar cache)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       gcc \
+       g++ \
+       libmagic1 \
+       libmagic-dev \
+       curl \
+       wget \
+       file \
     && rm -rf /var/lib/apt/lists/*
-
-# Crear usuario no-root por seguridad
-RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 WORKDIR /app
 
-# Copiar requirements y instalar dependencias Python
+# Copiar requirements e instalar dependencias
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
 
-# Copiar código de la aplicación
+# Copiar aplicación
 COPY . .
 
-# Crear directorios necesarios
-RUN mkdir -p /app/uploads /app/temp
-RUN chown -R appuser:appuser /app
-
-# Cambiar al usuario no-root
+# Crear directorios y usuario no-root
+RUN mkdir -p /app/uploads /app/temp \
+    && useradd -m appuser \
+    && chown -R appuser:appuser /app
 USER appuser
 
-# Verificar que las dependencias están instaladas
-RUN python -c "import minio; import magic; print('Dependencias OK')"
+ENV PORT=8003
+EXPOSE ${PORT}
 
-# Exponer el puerto
-EXPOSE 8003
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=5 \
+  CMD ["sh", "-c", "curl -f http://localhost:${PORT}/health || exit 1"]
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8003/health || exit 1
-
-# Comando para ejecutar la aplicación
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8003", "--reload"]
+# Ejecutar la aplicación (expande ${PORT} mediante sh -c)
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT}"]

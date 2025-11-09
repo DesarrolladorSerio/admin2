@@ -1,47 +1,34 @@
 # Imagen base Python 3.11
-FROM python:3.11-slim
+FROM python:3.11.9-slim
 
-# Metadata
-LABEL maintainer="admin-proyecto"
-LABEL description="Servicio de Notificaciones con Email y Queue"
+LABEL maintainer="Augusto Fuenzalida <augusto@utalca.cl>" \
+      version="1.0" \
+      description="Microservicio FastAPI - notifications-service"
 
-# Variables de entorno
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Crear usuario no-root
-RUN groupadd -r appuser && useradd -r -g appuser appuser
-
-# Directorio de trabajo
 WORKDIR /app
 
-# Copiar requirements primero (mejor cache de layers)
+# Copiar requirements e instalar dependencias
 COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
 
-# Instalar dependencias
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
-
-# Copiar código de la aplicación
+# Copiar aplicación
 COPY . .
 
-# Crear directorios necesarios
-RUN mkdir -p /app/logs /app/templates
-
-# Cambiar permisos
-RUN chown -R appuser:appuser /app
-
-# Cambiar a usuario no-root
+# Crear usuario no-root y ajustar permisos
+RUN useradd -m appuser && mkdir -p /app/logs /app/templates && chown -R appuser:appuser /app
 USER appuser
 
-# Exponer puerto
-EXPOSE 8004
+ENV PORT=8004
+EXPOSE ${PORT}
 
-# Healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8004/health', timeout=5)" || exit 1
+  CMD ["sh", "-c", "curl -f http://localhost:${PORT}/health || exit 1"]
 
-# Comando de inicio
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8004", "--workers", "1"]
+# Comando de inicio (usar este container también para celery-worker; Compose override command for worker)
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT}"]

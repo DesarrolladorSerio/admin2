@@ -47,6 +47,16 @@ db_data/
 *.sock
 *.tar
 *.bak
+*-primary-data/
+*-replica-data/
+pgdata/
+*.conf
+infrastructure/postgres/auth-primary-data/
+infrastructure/postgres/auth-replica-data/
+infrastructure/postgres/reservations-primary-data/
+infrastructure/postgres/reservations-replica-data/
+infrastructure/postgres/documents-primary-data/
+infrastructure/postgres/documents-replica-data/
 
 # ================================================
 # Editor / IDE
