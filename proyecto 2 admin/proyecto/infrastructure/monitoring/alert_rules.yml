@@ -1,0 +1,32 @@
+groups:
+  - name: monitoring.rules
+    rules:
+
+      - alert: BaseDeDatosCaida
+        expr: up{job="postgres_exporters"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Exportador de Postgres caído ({{ $labels.instance }})"
+          description: "El exportador de Postgres para {{ $labels.instance }} no está respondiendo."
+
+
+      - alert: RedisCaido
+        expr: up{job="redis_exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Exportador de Redis caído ({{ $labels.instance }})"
+          description: "El exportador de Redis para {{ $labels.instance }} no está respondiendo."
+
+
+      - alert: UsoAltoDeCPU
+        expr: (1 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[2m])) / avg by (instance) (rate(node_cpu_seconds_total[2m])))) > 0.9
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Uso alto de CPU en {{ $labels.instance }}"
+          description: "Uso de CPU superior al 90 % durante más de 2 minutos en {{ $labels.instance }}"

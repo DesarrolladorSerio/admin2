@@ -1,0 +1,9 @@
+global:
+  resolve_timeout: 5m
+route:
+  receiver: 'log'
+receivers:
+  - name: 'log'
+    # no-op receiver; Alertmanager will still log alerts at INFO when started with --log.level=info
+    # You can add webhook/email receivers here.
+    webhook_configs: []

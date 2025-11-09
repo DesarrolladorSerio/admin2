@@ -242,8 +242,8 @@ services:
     container_name: minio_storage
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
     ports:
       - "${MINIO_PORT:-9000}:9000"
       - "${MINIO_CONSOLE_PORT:-9001}:9001"  
@@ -685,7 +685,134 @@ services:
     restart: unless-stopped
 
 # ==========================
+# Monitoring services
+# ==========================
+  prometheus:
+    image: prom/prometheus:v2.49.0
+    container_name: prometheus
+    volumes:
+      - ./infrastructure/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infrastructure/monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - backend_net
+      - prometheus_net
+      - monitoring_net
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.25.0
+    container_name: alertmanager
+    volumes:
+      - ./infrastructure/monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "9093:9093"
+    networks:
+      - prometheus_net
+      - backend_net
+      - monitoring_net
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:9.5.8
+    container_name: grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: "${GRAFANA_ADMIN_USER}"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD}"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./infrastructure/monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./infrastructure/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - backend_net
+      - prometheus_net
+      - monitoring_net
+    restart: unless-stopped
+
+  # cadvisor removed on Windows hosts (cgroup/mount incompatibilities). Run cadvisor on Linux/WSL2 if needed.
+
+  node-exporter:
+    image: prom/node-exporter:v1.6.1
+    container_name: node_exporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    ports:
+      - "9100:9100"
+    networks:
+      - backend_net
+      - prometheus_net
+      - monitoring_net
+    restart: unless-stopped
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.43.1
+    container_name: redis_exporter
+    environment:
+      - REDIS_ADDR=redis:6379
+    ports:
+      - "9121:9121"
+    networks:
+      - backend_net
+      - prometheus_net
+      - monitoring_net
+    restart: unless-stopped
+
+  postgres-exporter-auth:
+    image: prometheuscommunity/postgres-exporter:v0.11.1
+    container_name: postgres_exporter_auth
+    environment:
+      DATA_SOURCE_NAME: "postgresql://admin:admin@auth-db:5432/auth_db?sslmode=disable"
+    ports:
+      - "9187:9187"
+    networks:
+      - backend_net
+      - prometheus_net
+      - database_net
+      - monitoring_net
+    restart: unless-stopped
+
+  postgres-exporter-reservations:
+    image: prometheuscommunity/postgres-exporter:v0.11.1
+    container_name: postgres_exporter_reservations
+    environment:
+      DATA_SOURCE_NAME: "postgresql://admin:admin@reservations-db-primary:5432/reservations_db?sslmode=disable"
+      WEB_LISTEN_ADDRESS: ":9188"
+    ports:
+      - "9188:9187"
+    networks:
+      - backend_net
+      - prometheus_net
+      - database_net
+      - monitoring_net
+    restart: unless-stopped
+
+  postgres-exporter-documents:
+    image: prometheuscommunity/postgres-exporter:v0.11.1
+    container_name: postgres_exporter_documents
+    environment:
+      DATA_SOURCE_NAME: "postgresql://admin:admin@documents-db:5432/documents_db?sslmode=disable"
+      WEB_LISTEN_ADDRESS: ":9189"
+    ports:
+      - "9189:9187"
+    networks:
+      - backend_net
+      - prometheus_net
+      - database_net
+      - monitoring_net
+    restart: unless-stopped
+
+# ==========================
 # Volúmenes persistentes
+# ==========================
 # ==========================
 volumes:
   minio_data:
@@ -697,6 +824,8 @@ volumes:
   documents_primary_data:
   documents_replica_data:
   pg_backups:
+  prometheus_data:
+  grafana_data:
 
 # ==========================
 # Redes
@@ -712,4 +841,13 @@ networks:
       config:
         - subnet: 172.28.0.0/16
   storage_net:
+    driver: bridge
+
+  # ==========================
+  # 🧭 Monitoring stack
+  # ==========================
+  # Prometheus + Grafana + cAdvisor + exporters
+  prometheus_net:
+    driver: bridge
+  monitoring_net:
     driver: bridge

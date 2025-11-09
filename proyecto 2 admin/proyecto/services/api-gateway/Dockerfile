@@ -15,9 +15,13 @@ RUN mkdir -p /var/cache/nginx /var/run /var/log/nginx && \
 
 # Copiar configuración personalizada
 COPY nginx.conf /etc/nginx/nginx.conf
+# Copiar página de error 50x
+COPY 50x.html /usr/share/nginx/html/50x.html
 
 # Exponer puerto HTTP
 EXPOSE 80
+
+# Cambiar a usuario no root
 
 # Cambiar a usuario no root
 USER nginx
@@ -25,4 +29,4 @@ USER nginx
 # Iniciar Nginx
 CMD ["nginx", "-g", "daemon off;"]
 
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://localhost:80 || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://localhost:80/health || exit 1
