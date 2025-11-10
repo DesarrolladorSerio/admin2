@@ -33,12 +33,14 @@ class ChatBotAPI {
      * Enviar mensaje al chatbot
      * @param {string} message - Mensaje del usuario
      * @param {string} sessionId - ID de la sesión (opcional)
+     * @param {boolean} forceNewSession - Forzar creación de nueva conversación
      */
-    async sendMessage(message, sessionId = null) {
+    async sendMessage(message, sessionId = null, forceNewSession = false) {
         try {
             const response = await apiClient.post('/chat', {
                 message: message,
-                session_id: sessionId
+                session_id: sessionId,
+                force_new_session: forceNewSession
             });
             return response.data;
         } catch (error) {
@@ -53,7 +55,7 @@ class ChatBotAPI {
      */
     async getSessionHistory(sessionId) {
         try {
-            const response = await apiClient.get(`/chat/history/${sessionId}`);
+            const response = await apiClient.get(`/sessions?session_id=${sessionId}`);
             return response.data;
         } catch (error) {
             console.error('Error obteniendo historial de sesión:', error);
@@ -89,7 +91,52 @@ class ChatBotAPI {
     }
 
     /**
-     * Obtener todas las sesiones del usuario
+     * Obtener todas las conversaciones del usuario con preview
+     * Similar al historial de ChatGPT
+     */
+    async getConversations() {
+        try {
+            const response = await apiClient.get('/chat/conversations');
+            return response.data;
+        } catch (error) {
+            console.error('Error obteniendo conversaciones:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Crear una nueva conversación
+     * @param {string} initialMessage - Mensaje inicial (opcional)
+     */
+    async createNewConversation(initialMessage = "Hola") {
+        try {
+            const response = await apiClient.post('/chat', {
+                message: initialMessage,
+                force_new_session: true
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Error creando nueva conversación:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Cargar mensajes de una conversación específica
+     * @param {string} sessionId - ID de la sesión
+     */
+    async loadConversation(sessionId) {
+        try {
+            const response = await apiClient.get(`/sessions?session_id=${sessionId}`);
+            return response.data;
+        } catch (error) {
+            console.error('Error cargando conversación:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Obtener todas las sesiones del usuario (deprecado, usar getConversations)
      */
     async getUserSessions() {
         try {

@@ -10,7 +10,7 @@ import redis
 from sqlmodel import Session, select
 
 from config import settings
-from db_models import ChatSession, ChatMessage, ChatMetrics
+from db_models import ChatSession, ChatMessage, ChatMetrics, User
 from knowledge_base import get_knowledge_context, search_knowledge
 
 logger = logging.getLogger(__name__)
@@ -28,8 +28,49 @@ class ChatBotService:
         )
         self.system_context = get_knowledge_context()
     
-    def create_session(self, db: Session, user_id: int) -> ChatSession:
-        """Crea una nueva sesión de chat para el usuario"""
+    def get_or_create_user(self, db: Session, user_id: int, email: str = None, nombre: str = None) -> User:
+        """
+        Obtiene un usuario existente o lo crea si no existe
+        
+        Args:
+            db: Sesión de base de datos
+            user_id: ID del usuario del sistema de autenticación
+            email: Email del usuario (opcional, se usará si se crea el usuario)
+            nombre: Nombre del usuario (opcional, se usará si se crea el usuario)
+        
+        Returns:
+            Usuario existente o recién creado
+        """
+        # Buscar usuario existente
+        statement = select(User).where(User.id == user_id)
+        user = db.exec(statement).first()
+        
+        if user:
+            logger.debug(f"Usuario encontrado en BD del chatbot: {user_id}")
+            return user
+        
+        # Crear nuevo usuario si no existe
+        new_user = User(
+            id=user_id,
+            email=email or f"user_{user_id}@system.local",
+            nombre=nombre or f"Usuario {user_id}"
+        )
+        
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        
+        logger.info(f"✅ Nuevo usuario creado en BD del chatbot: {user_id} ({new_user.email})")
+        return new_user
+    
+    def create_session(self, db: Session, user_id: int, email: str = None, nombre: str = None) -> ChatSession:
+        """
+        Crea una nueva sesión de chat para el usuario
+        Si el usuario no existe en la BD del chatbot, lo crea automáticamente
+        """
+        # Asegurar que el usuario existe en la BD del chatbot
+        self.get_or_create_user(db, user_id, email, nombre)
+        
         session_id = str(uuid.uuid4())
         
         chat_session = ChatSession(
@@ -45,27 +86,102 @@ class ChatBotService:
         logger.info(f"Nueva sesión de chat creada: {session_id} para usuario {user_id}")
         return chat_session
     
-    def get_or_create_session(self, db: Session, user_id: int, session_id: Optional[str] = None) -> ChatSession:
-        """Obtiene una sesión existente o crea una nueva"""
+    def create_anonymous_session(self, db: Session) -> ChatSession:
+        """Crea una nueva sesión de chat anónima (sin user_id)"""
+        session_id = str(uuid.uuid4())
+        
+        chat_session = ChatSession(
+            user_id=None,  # Sesión anónima
+            session_id=session_id,
+            is_active=True
+        )
+        
+        db.add(chat_session)
+        db.commit()
+        db.refresh(chat_session)
+        
+        logger.info(f"Nueva sesión de chat anónima creada: {session_id}")
+        return chat_session
+    
+    def get_or_create_anonymous_session(self, db: Session, session_id: Optional[str] = None) -> ChatSession:
+        """Obtiene una sesión anónima existente o crea una nueva"""
+        if session_id:
+            # Buscar sesión existente anónima
+            statement = select(ChatSession).where(
+                ChatSession.session_id == session_id,
+                ChatSession.user_id.is_(None),  # Sesión anónima
+                ChatSession.is_active.is_(True)
+            )
+            session = db.exec(statement).first()
+            
+            if session:
+                logger.info(f"Sesión anónima encontrada: {session_id}")
+                return session
+        
+        # Crear nueva sesión anónima
+        return self.create_anonymous_session(db)
+    
+    def get_or_create_session(self, db: Session, user_id: int, session_id: Optional[str] = None, email: str = None, nombre: str = None, force_new: bool = False) -> ChatSession:
+        """
+        Obtiene una sesión existente o crea una nueva
+        Si el usuario no existe, lo crea automáticamente
+        
+        Args:
+            force_new: Si es True, siempre crea una nueva sesión (para botón "Nueva conversación")
+        """
+        # Si se solicita explícitamente una nueva sesión, crearla directamente
+        if force_new:
+            logger.info(f"Creando nueva sesión forzada para usuario {user_id}")
+            return self.create_session(db, user_id, email, nombre)
+        
+        # Si el cliente provee un session_id, intentar recuperarla (caso ideal)
         if session_id:
             statement = select(ChatSession).where(
                 ChatSession.session_id == session_id,
-                ChatSession.user_id == user_id,
-                ChatSession.is_active == True
+                ChatSession.user_id == user_id
             )
             session = db.exec(statement).first()
             if session:
                 return session
-        
-        return self.create_session(db, user_id)
+
+        # Si no se entrega session_id, intentar reutilizar una sesión ACTIVA del usuario
+        statement_active = select(ChatSession).where(
+            ChatSession.user_id == user_id,
+            ChatSession.is_active.is_(True)
+        ).order_by(ChatSession.updated_at.desc())
+        active_session = db.exec(statement_active).first()
+        if active_session:
+            logger.debug(f"Reusando sesión activa para usuario {user_id}: {active_session.session_id}")
+            return active_session
+
+        # Si no hay sesiones activas, intentar recuperar la última sesión (incluso si fue cerrada)
+        # Esto evita perder la conversación al recargar (F5) cuando el frontend no envía session_id.
+        statement_last = select(ChatSession).where(
+            ChatSession.user_id == user_id
+        ).order_by(ChatSession.updated_at.desc())
+        last_session = db.exec(statement_last).first()
+        if last_session:
+            logger.debug(f"Reusando última sesión para usuario {user_id}: {last_session.session_id}")
+            return last_session
+
+        # Si no existe ninguna sesión, crear una nueva
+        return self.create_session(db, user_id, email, nombre)
     
     def get_conversation_history(self, db: Session, session_id: str, limit: int = None) -> List[ChatMessage]:
         """Obtiene el historial de conversación de una sesión"""
         if limit is None:
             limit = settings.MAX_CONVERSATION_HISTORY
         
+        # Primero, obtener la sesión por UUID para conseguir el ID numérico
+        session_statement = select(ChatSession).where(ChatSession.session_id == session_id)
+        session = db.exec(session_statement).first()
+        
+        if not session:
+            return []  # Si no existe la sesión, retornar lista vacía
+        
+        # Ahora buscar mensajes usando el ID numérico de la sesión
         statement = select(ChatMessage).where(
-            ChatMessage.session_id == session_id
+            ChatMessage.session_id == session.id  # Usar el ID numérico, no el UUID
         ).order_by(ChatMessage.timestamp.desc()).limit(limit)
         
         messages = db.exec(statement).all()
@@ -105,7 +221,8 @@ class ChatBotService:
         db: Session, 
         session: ChatSession, 
         user_message: str,
-        user_context: Optional[Dict[str, Any]] = None
+        user_context: Optional[Dict[str, Any]] = None,
+        is_anonymous: bool = False
     ) -> Dict[str, Any]:
         """Genera una respuesta usando Ollama (100% GRATUITO - Sin costos API)"""
         start_time = time.time()
@@ -136,6 +253,7 @@ class ChatBotService:
                 options={
                     'temperature': 0.7,
                     'num_predict': 500,  # Equivalente a max_tokens
+                    'num_ctx': 2048,  # Contexto ajustado para tinyllama (evita warning)
                 }
             )
             
@@ -237,8 +355,55 @@ class ChatBotService:
             for msg in messages
         ]
     
+    def get_user_conversations(self, db: Session, user_id: int) -> List[Dict[str, Any]]:
+        """
+        Obtiene todas las conversaciones del usuario con información resumida
+        Similar al historial de ChatGPT
+        """
+        # Obtener todas las sesiones del usuario, ordenadas por última actualización
+        statement = select(ChatSession).where(
+            ChatSession.user_id == user_id
+        ).order_by(ChatSession.updated_at.desc())
+        
+        sessions = db.exec(statement).all()
+        
+        conversations = []
+        for session in sessions:
+            # Obtener el primer mensaje del usuario para el preview
+            first_message_statement = select(ChatMessage).where(
+                ChatMessage.session_id == session.id,
+                ChatMessage.role == "user"
+            ).order_by(ChatMessage.timestamp.asc()).limit(1)
+            
+            first_msg = db.exec(first_message_statement).first()
+            
+            # Contar mensajes totales
+            count_statement = select(ChatMessage).where(
+                ChatMessage.session_id == session.id
+            )
+            message_count = len(db.exec(count_statement).all())
+            
+            # Crear preview del contenido (primeros 50 caracteres del primer mensaje)
+            preview = "Nueva conversación"
+            if first_msg:
+                preview = first_msg.content[:50] + "..." if len(first_msg.content) > 50 else first_msg.content
+            
+            conversations.append({
+                "session_id": session.session_id,
+                "created_at": session.created_at.isoformat(),
+                "updated_at": session.updated_at.isoformat(),
+                "is_active": session.is_active,
+                "message_count": message_count,
+                "preview": preview
+            })
+        
+        return conversations
+    
     def clear_session(self, db: Session, session_id: str, user_id: int) -> bool:
-        """Cierra una sesión de chat"""
+        """
+        Cierra una sesión de chat y ELIMINA todo el historial de mensajes.
+        Usado cuando el usuario presiona el botón de cerrar sesión en la UI.
+        """
         statement = select(ChatSession).where(
             ChatSession.session_id == session_id,
             ChatSession.user_id == user_id
@@ -246,10 +411,20 @@ class ChatBotService:
         session = db.exec(statement).first()
         
         if session:
+            # Eliminar todos los mensajes de esta sesión
+            delete_messages_statement = select(ChatMessage).where(
+                ChatMessage.session_id == session.id
+            )
+            messages = db.exec(delete_messages_statement).all()
+            for msg in messages:
+                db.delete(msg)
+            
+            # Marcar sesión como inactiva (o podrías eliminarla también)
             session.is_active = False
             db.add(session)
             db.commit()
-            logger.info(f"Sesión {session_id} cerrada")
+            
+            logger.info(f"Sesión {session_id} cerrada y {len(messages)} mensajes eliminados")
             return True
         
         return False

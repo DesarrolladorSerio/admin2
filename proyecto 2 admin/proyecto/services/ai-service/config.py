@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     
     # Ollama Configuration (100% GRATUITO - Sin costos ni API keys)
     OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
-    OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama2")
+    OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "tinyllama")
     OLLAMA_TIMEOUT: int = int(os.getenv("OLLAMA_TIMEOUT", "60"))
     
     # Redis para caché y sesiones
@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     
     # Configuración del servicio
     PORT: int = int(os.getenv("PORT", "8005"))
-    MAX_CONVERSATION_HISTORY: int = 10
+    MAX_CONVERSATION_HISTORY: int = 8  # Reducido para ajustarse al contexto de 2048 tokens
     SESSION_TIMEOUT_MINUTES: int = 60
     
     class Config:

@@ -14,20 +14,20 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE INDEX idx_users_email ON users(email);
 
--- Tabla de sesiones de chat
+-- Tabla de sesiones de chat (soporta sesiones anónimas con user_id NULL)
 CREATE TABLE IF NOT EXISTS chat_sessions (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,  -- Nullable para sesiones anónimas
     session_id VARCHAR(255) UNIQUE NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_active BOOLEAN DEFAULT TRUE,
-    CONSTRAINT fk_chat_sessions_user FOREIGN KEY (user_id) REFERENCES users(id)
+    is_active BOOLEAN DEFAULT TRUE
 );
 
 CREATE INDEX idx_chat_sessions_user_id ON chat_sessions(user_id);
 CREATE INDEX idx_chat_sessions_session_id ON chat_sessions(session_id);
 CREATE INDEX idx_chat_sessions_is_active ON chat_sessions(is_active);
+CREATE INDEX idx_chat_sessions_anonymous ON chat_sessions(session_id) WHERE user_id IS NULL;
 
 -- Tabla de mensajes de chat
 CREATE TABLE IF NOT EXISTS chat_messages (
@@ -45,19 +45,17 @@ CREATE INDEX idx_chat_messages_session_id ON chat_messages(session_id);
 CREATE INDEX idx_chat_messages_timestamp ON chat_messages(timestamp);
 CREATE INDEX idx_chat_messages_role ON chat_messages(role);
 
--- Tabla de métricas de uso
+-- Tabla de métricas de uso (soporta métricas de sesiones anónimas)
 CREATE TABLE IF NOT EXISTS chat_metrics (
     id SERIAL PRIMARY KEY,
     session_id INTEGER NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,  -- Nullable para sesiones anónimas
     date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     total_messages INTEGER DEFAULT 0,
     total_tokens INTEGER DEFAULT 0,
     avg_response_time_ms FLOAT DEFAULT 0.0,
     topics_discussed TEXT DEFAULT '',
-    satisfaction_rating INTEGER CHECK (satisfaction_rating >= 1 AND satisfaction_rating <= 5),
-    CONSTRAINT fk_chat_metrics_session FOREIGN KEY (session_id) REFERENCES chat_sessions(id),
-    CONSTRAINT fk_chat_metrics_user FOREIGN KEY (user_id) REFERENCES users(id)
+    satisfaction_rating INTEGER CHECK (satisfaction_rating >= 1 AND satisfaction_rating <= 5)
 );
 
 CREATE INDEX idx_chat_metrics_user_id ON chat_metrics(user_id);

@@ -53,11 +53,18 @@ def verify_token(token: str = Depends(oauth2_scheme)) -> dict:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         user_id: int = payload.get("user_id")
         username: str = payload.get("sub")
+        email: str = payload.get("email")
+        nombre: str = payload.get("nombre")
         
         if user_id is None or username is None:
             raise credentials_exception
             
-        return {"user_id": user_id, "username": username}
+        return {
+            "user_id": user_id, 
+            "username": username,
+            "email": email,
+            "nombre": nombre
+        }
     except JWTError:
         raise credentials_exception
 
@@ -69,6 +76,7 @@ class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
     context: Optional[dict] = None  # Contexto adicional del usuario
+    force_new_session: Optional[bool] = False  # Forzar creación de nueva conversación
 
 class ChatResponse(BaseModel):
     response: str
@@ -130,15 +138,21 @@ async def chat(
     - **message**: Mensaje del usuario
     - **session_id**: ID de sesión (opcional, se crea uno nuevo si no se proporciona)
     - **context**: Contexto adicional del usuario (página actual, acción que intenta realizar, etc.)
+    - **force_new_session**: Si es True, crea una nueva conversación (botón "Nueva conversación")
     """
     try:
         user_id = user_data["user_id"]
+        email = user_data.get("email")
+        nombre = user_data.get("nombre")
         
-        # Obtener o crear sesión
+        # Obtener o crear sesión (creará el usuario automáticamente si no existe)
         session = chatbot_service.get_or_create_session(
             db, 
             user_id, 
-            request.session_id
+            request.session_id,
+            email,
+            nombre,
+            force_new=request.force_new_session
         )
         
         # Generar respuesta
@@ -158,7 +172,47 @@ async def chat(
             detail=f"Error procesando la consulta: {str(e)}"
         )
 
-@app.get("/chat/history/{session_id}", response_model=SessionHistoryResponse)
+@app.post("/chat/public", response_model=ChatResponse)
+async def public_chat(
+    request: ChatRequest,
+    db: Session = Depends(get_session)
+):
+    """
+    Endpoint público para interactuar con el chatbot sin autenticación
+    
+    - **message**: Mensaje del usuario
+    - **session_id**: ID de sesión (opcional, se crea uno nuevo si no se proporciona)
+    - **context**: Contexto adicional del usuario
+    """
+    try:
+        # Usar user_id = null para sesiones anónimas
+        user_id = None
+        
+        # Obtener o crear sesión anónima
+        session = chatbot_service.get_or_create_anonymous_session(
+            db, 
+            request.session_id
+        )
+        
+        # Generar respuesta
+        response = await chatbot_service.generate_response(
+            db,
+            session,
+            request.message,
+            request.context,
+            is_anonymous=True
+        )
+        
+        return ChatResponse(**response)
+        
+    except Exception as e:
+        logger.error(f"Error en endpoint /chat/public: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"El servicio de IA no está disponible en este momento. Por favor, intenta más tarde o contacta al administrador."
+        )
+
+@app.get("/sessions", response_model=list)
 def get_history(
     session_id: str,
     user_data: dict = Depends(verify_token),
@@ -245,6 +299,28 @@ def get_metrics(
             detail=f"Error obteniendo métricas: {str(e)}"
         )
 
+@app.get("/chat/conversations")
+def get_user_conversations(
+    user_data: dict = Depends(verify_token),
+    db: Session = Depends(get_session)
+):
+    """
+    Obtiene todas las conversaciones del usuario con preview
+    Similar al historial de ChatGPT - muestra lista de conversaciones previas
+    """
+    try:
+        conversations = chatbot_service.get_user_conversations(db, user_data["user_id"])
+        return {
+            "conversations": conversations
+        }
+        
+    except Exception as e:
+        logger.error(f"Error obteniendo conversaciones: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error obteniendo conversaciones: {str(e)}"
+        )
+
 @app.get("/chat/sessions")
 def get_user_sessions(
     user_data: dict = Depends(verify_token),
@@ -252,11 +328,12 @@ def get_user_sessions(
 ):
     """
     Obtiene todas las sesiones activas del usuario
+    (Mantener por compatibilidad - deprecado, usar /chat/conversations)
     """
     try:
         statement = select(ChatSession).where(
             ChatSession.user_id == user_data["user_id"],
-            ChatSession.is_active == True
+            ChatSession.is_active.is_(True)
         ).order_by(ChatSession.updated_at.desc())
         
         sessions = db.exec(statement).all()

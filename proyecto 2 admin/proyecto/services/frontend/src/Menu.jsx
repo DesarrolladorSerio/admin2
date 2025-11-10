@@ -170,6 +170,19 @@ function MenuOptions({ userRole, onNavigate, onLogout }) {
                     🔐 <strong>Panel de Administración Activo</strong>
                 </div>
             )}
+
+            {/* Información sobre el asistente IA */}
+            <div style={{
+                marginTop: '20px',
+                padding: '10px',
+                background: '#f3e5ff',
+                border: '1px solid #d1b3ff',
+                borderRadius: '4px',
+                fontSize: '14px'
+            }}>
+                🤖 <strong>Asistente IA disponible</strong><br />
+                Busca el botón flotante en la esquina inferior derecha
+            </div>
         </div>
     );
 }

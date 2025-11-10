@@ -7,7 +7,7 @@ class ChatSession(SQLModel, table=True):
     __tablename__ = "chat_sessions"
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id", index=True)
+    user_id: Optional[int] = Field(default=None, foreign_key="users.id", index=True)
     session_id: str = Field(index=True, unique=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -37,7 +37,7 @@ class ChatMetrics(SQLModel, table=True):
     
     id: Optional[int] = Field(default=None, primary_key=True)
     session_id: int = Field(foreign_key="chat_sessions.id", index=True)
-    user_id: int = Field(index=True)
+    user_id: Optional[int] = Field(default=None, index=True)
     date: datetime = Field(default_factory=datetime.utcnow, index=True)
     total_messages: int = Field(default=0)
     total_tokens: int = Field(default=0)
