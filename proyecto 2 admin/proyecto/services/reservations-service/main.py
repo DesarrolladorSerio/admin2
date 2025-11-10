@@ -16,7 +16,7 @@ from db_reservas import (
 )
 from fastapi import Depends, FastAPI, HTTPException, status
 from pydantic import BaseModel
-from sqlmodel import Session
+from sqlmodel import Session, select, func
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -659,3 +659,367 @@ def check_availability(
         "message": conflict_result["message"],
         "conflicting_reservation": conflict_result["conflicting_reservation"]
     }
+
+# =============================================================================
+# ENDPOINTS MÓDULO ADMINISTRADOR (RF08-RF13)
+# =============================================================================
+
+@app.get("/admin/dashboard")
+async def get_admin_dashboard(
+    session: Session = Depends(get_session),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    RF08: Dashboard administrativo con listado de reservas y estado documental
+    """
+    if current_user.get("role") not in ["admin", "employee"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores y empleados pueden acceder al dashboard"
+        )
+    
+    from db_reservas import Reservation
+    
+    # Obtener todas las reservas activas
+    reservas = get_all_reservations(session)
+    
+    # Obtener estadísticas
+    total_reservas = session.exec(
+        select(func.count()).select_from(Reservation)
+    ).one()
+    
+    reservas_activas = session.exec(
+        select(func.count()).select_from(Reservation).where(Reservation.estado == "activa")
+    ).one()
+    
+    reservas_completadas = session.exec(
+        select(func.count()).select_from(Reservation).where(Reservation.estado == "completada")
+    ).one()
+    
+    reservas_anuladas = session.exec(
+        select(func.count()).select_from(Reservation).where(Reservation.estado == "anulada")
+    ).one()
+    
+    # Estado documental
+    docs_completos = session.exec(
+        select(func.count()).select_from(Reservation).where(Reservation.estado_documental == "completo")
+    ).one()
+    
+    docs_incompletos = session.exec(
+        select(func.count()).select_from(Reservation).where(Reservation.estado_documental == "incompleto")
+    ).one()
+    
+    docs_pendientes = session.exec(
+        select(func.count()).select_from(Reservation).where(Reservation.estado_documental == "pendiente")
+    ).one()
+    
+    # Consultar servicio de documentos para información adicional
+    try:
+        token = current_user.get("token", "")
+        async with httpx.AsyncClient() as client:
+            # Intentar obtener estadísticas de documentos
+            docs_response = await client.get(
+                "http://documents-service:8000/reportes/avance-antiguos",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=5.0
+            )
+            avance_digitalizacion = docs_response.json() if docs_response.status_code == 200 else None
+    except Exception as e:
+        logger.warning(f"No se pudo obtener avance de digitalización: {e}")
+        avance_digitalizacion = None
+    
+    return {
+        "estadisticas": {
+            "total_reservas": total_reservas,
+            "reservas_activas": reservas_activas,
+            "reservas_completadas": reservas_completadas,
+            "reservas_anuladas": reservas_anuladas,
+            "docs_completos": docs_completos,
+            "docs_incompletos": docs_incompletos,
+            "docs_pendientes": docs_pendientes
+        },
+        "reservas": reservas,
+        "avance_digitalizacion": avance_digitalizacion
+    }
+
+@app.post("/admin/buscar-reservas")
+async def buscar_reservas(
+    busqueda: dict,
+    session: Session = Depends(get_session),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    RF09: Búsqueda avanzada por nombre, RUT, tipo de licencia, fechas
+    """
+    if current_user.get("role") not in ["admin", "employee"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+    
+    from db_reservas import Reservation
+    
+    query = select(Reservation)
+    
+    # Filtros
+    if "nombre" in busqueda and busqueda["nombre"]:
+        query = query.where(Reservation.usuario_nombre.ilike(f"%{busqueda['nombre']}%"))
+    
+    if "rut" in busqueda and busqueda["rut"]:
+        query = query.where(Reservation.usuario_rut.contains(busqueda["rut"]))
+    
+    if "tipo_tramite" in busqueda and busqueda["tipo_tramite"]:
+        query = query.where(Reservation.tipo_tramite == busqueda["tipo_tramite"])
+    
+    if "categoria_tramite" in busqueda and busqueda["categoria_tramite"]:
+        query = query.where(Reservation.categoria_tramite == busqueda["categoria_tramite"])
+    
+    if "fecha_inicio" in busqueda and busqueda["fecha_inicio"]:
+        fecha_inicio = datetime.fromisoformat(busqueda["fecha_inicio"]).date()
+        query = query.where(Reservation.fecha >= fecha_inicio)
+    
+    if "fecha_fin" in busqueda and busqueda["fecha_fin"]:
+        fecha_fin = datetime.fromisoformat(busqueda["fecha_fin"]).date()
+        query = query.where(Reservation.fecha <= fecha_fin)
+    
+    if "estado" in busqueda and busqueda["estado"]:
+        query = query.where(Reservation.estado == busqueda["estado"])
+    
+    if "estado_documental" in busqueda and busqueda["estado_documental"]:
+        query = query.where(Reservation.estado_documental == busqueda["estado_documental"])
+    
+    resultados = session.exec(query).all()
+    
+    return {"resultados": resultados, "count": len(resultados)}
+
+@app.get("/admin/estadisticas-tramites")
+async def estadisticas_tramites(
+    fecha_inicio: Optional[str] = None,
+    fecha_fin: Optional[str] = None,
+    session: Session = Depends(get_session),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    RF09: Generar conteos y rankings por tipo de trámite
+    """
+    if current_user.get("role") not in ["admin", "employee"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+    
+    from db_reservas import Reservation
+    
+    query = select(
+        Reservation.tipo_tramite,
+        func.count(Reservation.id).label("cantidad")
+    ).group_by(Reservation.tipo_tramite)
+    
+    if fecha_inicio:
+        query = query.where(Reservation.fecha >= datetime.fromisoformat(fecha_inicio).date())
+    if fecha_fin:
+        query = query.where(Reservation.fecha <= datetime.fromisoformat(fecha_fin).date())
+    
+    resultados = session.exec(query).all()
+    
+    # Convertir a lista de diccionarios y ordenar
+    ranking = [{"tipo_tramite": r[0], "cantidad": r[1]} for r in resultados]
+    ranking.sort(key=lambda x: x["cantidad"], reverse=True)
+    
+    # También por categoría
+    query_categorias = select(
+        Reservation.categoria_tramite,
+        func.count(Reservation.id).label("cantidad")
+    ).group_by(Reservation.categoria_tramite)
+    
+    if fecha_inicio:
+        query_categorias = query_categorias.where(Reservation.fecha >= datetime.fromisoformat(fecha_inicio).date())
+    if fecha_fin:
+        query_categorias = query_categorias.where(Reservation.fecha <= datetime.fromisoformat(fecha_fin).date())
+    
+    resultados_categorias = session.exec(query_categorias).all()
+    ranking_categorias = [{"categoria": r[0], "cantidad": r[1]} for r in resultados_categorias]
+    ranking_categorias.sort(key=lambda x: x["cantidad"], reverse=True)
+    
+    return {
+        "ranking_tramites": ranking,
+        "ranking_categorias": ranking_categorias,
+        "total_tramites": sum(r["cantidad"] for r in ranking)
+    }
+
+@app.post("/admin/enviar-notificacion/{reserva_id}")
+async def enviar_notificacion_ciudadano(
+    reserva_id: int,
+    notificacion: dict,
+    session: Session = Depends(get_session),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    RF10: Enviar notificaciones al ciudadano para documentos faltantes o recordatorios
+    """
+    if current_user.get("role") not in ["admin", "employee"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+    
+    reserva = get_reservation_by_id(session, reserva_id)
+    if not reserva:
+        raise HTTPException(status_code=404, detail="Reserva no encontrada")
+    
+    # Enviar notificación
+    tipo = notificacion.get("tipo", "recordatorio")  # recordatorio, documentos_faltantes
+    mensaje = notificacion.get("mensaje", "")
+    
+    try:
+        await send_notification(
+            f"reservation/{tipo}",
+            {
+                "user_email": reserva.usuario_email,
+                "user_name": reserva.usuario_nombre,
+                "reservation_id": reserva_id,
+                "fecha": str(reserva.fecha),
+                "hora": reserva.hora,
+                "tipo_tramite": reserva.tipo_tramite,
+                "mensaje": mensaje
+            }
+        )
+        return {"success": True, "message": "Notificación enviada"}
+    except Exception as e:
+        logger.error(f"Error enviando notificación: {e}")
+        return {"success": False, "message": str(e)}
+
+@app.get("/admin/vencimientos-proximos")
+async def consultar_vencimientos(
+    dias: int = 30,
+    session: Session = Depends(get_session),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    RF12: Consultar próximos vencimientos de licencias
+    """
+    if current_user.get("role") not in ["admin", "employee"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        token = current_user.get("token", "")
+        async with httpx.AsyncClient() as client:
+            # Consultar servicio de autenticación para obtener usuarios con licencias próximas a vencer
+            response = await client.get(
+                f"http://auth-service:8000/admin/licencias-por-vencer?dias={dias}",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=10.0
+            )
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                return {"vencimientos": [], "message": "No se pudieron obtener los vencimientos"}
+    
+    except Exception as e:
+        logger.error(f"Error consultando vencimientos: {e}")
+        return {"vencimientos": [], "error": str(e)}
+
+@app.post("/admin/anular-reserva/{reserva_id}")
+async def anular_reserva(
+    reserva_id: int,
+    anulacion: dict,
+    session: Session = Depends(get_session),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    RF13: Anular reservas con motivo registrado
+    """
+    if current_user.get("role") not in ["admin", "employee"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores y empleados pueden anular reservas"
+        )
+    
+    reserva = get_reservation_by_id(session, reserva_id)
+    if not reserva:
+        raise HTTPException(status_code=404, detail="Reserva no encontrada")
+    
+    if reserva.estado == "anulada":
+        raise HTTPException(status_code=400, detail="La reserva ya está anulada")
+    
+    motivo = anulacion.get("motivo", "")
+    if not motivo:
+        raise HTTPException(status_code=400, detail="Debe proporcionar un motivo de anulación")
+    
+    # Actualizar reserva
+    reserva.estado = "anulada"
+    reserva.motivo_anulacion = motivo
+    reserva.anulada_por = current_user["id"]
+    reserva.fecha_anulacion = datetime.utcnow()
+    reserva.updated_at = datetime.utcnow()
+    
+    session.add(reserva)
+    session.commit()
+    session.refresh(reserva)
+    
+    # Enviar notificación al ciudadano
+    try:
+        await send_notification(
+            "reservation/anulacion",
+            {
+                "user_email": reserva.usuario_email,
+                "user_name": reserva.usuario_nombre,
+                "reservation_id": reserva_id,
+                "fecha": str(reserva.fecha),
+                "hora": reserva.hora,
+                "tipo_tramite": reserva.tipo_tramite,
+                "motivo": motivo
+            }
+        )
+    except Exception as e:
+        logger.warning(f"No se pudo enviar notificación de anulación: {e}")
+    
+    return {
+        "success": True,
+        "message": "Reserva anulada exitosamente",
+        "reserva": reserva
+    }
+
+@app.put("/admin/actualizar-estado-documental/{reserva_id}")
+async def actualizar_estado_documental(
+    reserva_id: int,
+    estado: dict,
+    session: Session = Depends(get_session),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    RF08: Actualizar estado documental de una reserva
+    """
+    if current_user.get("role") not in ["admin", "employee"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+    
+    reserva = get_reservation_by_id(session, reserva_id)
+    if not reserva:
+        raise HTTPException(status_code=404, detail="Reserva no encontrada")
+    
+    nuevo_estado = estado.get("estado_documental")
+    if nuevo_estado not in ["pendiente", "incompleto", "completo"]:
+        raise HTTPException(status_code=400, detail="Estado documental inválido")
+    
+    reserva.estado_documental = nuevo_estado
+    reserva.updated_at = datetime.utcnow()
+    
+    if "notas_admin" in estado:
+        reserva.notas_admin = estado["notas_admin"]
+    
+    session.add(reserva)
+    session.commit()
+    session.refresh(reserva)
+    
+    # Si está incompleto, enviar notificación
+    if nuevo_estado == "incompleto":
+        try:
+            await send_notification(
+                "reservation/documentos_faltantes",
+                {
+                    "user_email": reserva.usuario_email,
+                    "user_name": reserva.usuario_nombre,
+                    "reservation_id": reserva_id,
+                    "notas": estado.get("notas_admin", "Faltan documentos por completar")
+                }
+            )
+        except Exception as e:
+            logger.warning(f"No se pudo enviar notificación: {e}")
+    
+    return {"success": True, "reserva": reserva}
+
+# =============================================================================
+# HEALTH CHECK
+# =============================================================================

@@ -21,10 +21,22 @@ class Reservation(SQLModel, table=True):
     hora: str
     usuario_id: int # Ya no es una llave foránea
     usuario_nombre: str
+    usuario_rut: Optional[str] = None  # RUT del usuario
+    usuario_email: Optional[str] = None  # Email del usuario
+    usuario_telefono: Optional[str] = None  # Teléfono del usuario
     tipo_tramite: str  # Nuevo campo para el tipo de trámite
+    categoria_tramite: Optional[str] = None  # Categoría del trámite
     descripcion: str = ""
-    estado: str = "activa"  # activa, cancelada, completada
+    estado: str = "activa"  # activa, cancelada, completada, anulada
+    estado_documental: str = "pendiente"  # pendiente, incompleto, completo
+    documentos_requeridos: Optional[str] = None  # JSON con lista de documentos
+    documentos_cargados: Optional[str] = None  # JSON con lista de documentos subidos
+    motivo_anulacion: Optional[str] = None  # Razón de anulación si aplica
+    anulada_por: Optional[int] = None  # ID del admin que anuló
+    fecha_anulacion: Optional[datetime] = None
+    notas_admin: Optional[str] = None  # Notas internas del administrador
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 # =============================================================================
 # FUNCIONES DE BASE DE DATOS

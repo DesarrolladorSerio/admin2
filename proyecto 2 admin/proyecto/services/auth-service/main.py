@@ -649,6 +649,79 @@ async def consultar_datos_municipales(
             detail=f"Error al consultar bases municipales: {str(e)}"
         )
 
+@app.get("/admin/licencias-por-vencer")
+async def get_licencias_por_vencer(
+    dias: int = 30,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    """
+    RF12: Obtener usuarios con licencias próximas a vencer
+    """
+    if current_user.role not in ["admin", "employee"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores y empleados pueden consultar vencimientos"
+        )
+    
+    from db_auth import DatosMunicipales
+    from sqlmodel import select
+    from datetime import date, timedelta
+    
+    fecha_limite = date.today() + timedelta(days=dias)
+    
+    # Buscar licencias que vencen en el período
+    vencimientos = []
+    
+    try:
+        # Obtener todos los datos municipales con licencias
+        datos_municipales = session.exec(
+            select(DatosMunicipales)
+            .where(DatosMunicipales.licencia_vigente == True)
+        ).all()
+        
+        for datos in datos_municipales:
+            if datos.licencia_fecha_vencimiento:
+                try:
+                    fecha_vencimiento = datetime.strptime(datos.licencia_fecha_vencimiento, "%Y-%m-%d").date()
+                    
+                    # Si vence dentro del período
+                    if fecha_vencimiento <= fecha_limite and fecha_vencimiento >= date.today():
+                        # Obtener información del usuario
+                        usuario = session.get(User, datos.user_id)
+                        if usuario:
+                            dias_restantes = (fecha_vencimiento - date.today()).days
+                            vencimientos.append({
+                                "user_id": usuario.id,
+                                "rut": usuario.rut,
+                                "nombre": usuario.nombre,
+                                "email": usuario.email,
+                                "telefono": usuario.telefono,
+                                "licencia_numero": datos.licencia_numero,
+                                "fecha_vencimiento": datos.licencia_fecha_vencimiento,
+                                "dias_restantes": dias_restantes,
+                                "categorias": datos.licencia_categorias
+                            })
+                except ValueError:
+                    # Fecha en formato inválido, saltar
+                    continue
+        
+        # Ordenar por días restantes
+        vencimientos.sort(key=lambda x: x["dias_restantes"])
+        
+        return {
+            "vencimientos": vencimientos,
+            "total": len(vencimientos),
+            "periodo_dias": dias
+        }
+    
+    except Exception as e:
+        logger.error(f"Error al consultar vencimientos: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
 @app.get("/health")
 def health_check():
     """Endpoint de salud para Docker."""

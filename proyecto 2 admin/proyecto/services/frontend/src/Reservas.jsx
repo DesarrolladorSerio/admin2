@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Calendar from './components/Calendar';
 import ReservationList from './components/ReservationList';
-import ReservationForm from './components/ReservationForm';
+import ReservationFormNew from './components/ReservationFormNew';
 import reservationAPI from './services/reservationAPI';
 import authAPI from './services/authAPI';
 
@@ -174,7 +174,7 @@ export default function Reservas() {
       )}
 
       {view === 'form' && (
-        <ReservationForm
+        <ReservationFormNew
           currentUser={currentUser}
           editingReservation={editingReservation}
           onSubmit={editingReservation ?
