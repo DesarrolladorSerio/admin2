@@ -127,7 +127,7 @@ def init_default_users(session: Session):
             username="admin@municipalidad.cl",
             email="admin@municipalidad.cl", 
             nombre="Administrador Municipal",
-            password="sysadmin",
+            password="admin123",
             rut="11111111-1",
             role="admin"
         )
