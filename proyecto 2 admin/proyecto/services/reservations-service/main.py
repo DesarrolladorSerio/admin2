@@ -358,56 +358,281 @@ def get_calendar_reservations(
 def get_tipos_tramites():
     """Obtener los tipos de trámites disponibles en la municipalidad"""
     tipos_tramites = [
+        # PRIMER OTORGAMIENTO - NO PROFESIONALES
         {
-            "id": "licencia_conducir",
-            "nombre": "Licencia de Conducir",
-            "descripcion": "Obtención o renovación de licencia de conducir",
+            "id": "primer_otorg_clase_b",
+            "nombre": "Primer Otorgamiento - Clase B (Autos)",
+            "categoria": "primer_otorgamiento",
+            "descripcion": "Primera licencia para conducir automóviles",
+            "duracion_estimada": "45 minutos"
+        },
+        {
+            "id": "primer_otorg_clase_c",
+            "nombre": "Primer Otorgamiento - Clase C (Motos)",
+            "categoria": "primer_otorgamiento",
+            "descripcion": "Primera licencia para conducir motocicletas",
+            "duracion_estimada": "40 minutos"
+        },
+        {
+            "id": "primer_otorg_clase_cr",
+            "nombre": "Primer Otorgamiento - Clase CR (Triciclos)",
+            "categoria": "primer_otorgamiento",
+            "descripcion": "Licencia para triciclos motorizados de carga",
             "duracion_estimada": "30 minutos"
         },
+        {
+            "id": "primer_otorg_clase_b_17",
+            "nombre": "Primer Otorgamiento - Clase B (17 años)",
+            "categoria": "primer_otorgamiento",
+            "descripcion": "Licencia clase B para menores de 18 años",
+            "duracion_estimada": "50 minutos"
+        },
+        
+        # PRIMER OTORGAMIENTO - ESPECIALES
+        {
+            "id": "primer_otorg_clase_d",
+            "nombre": "Primer Otorgamiento - Clase D (Maquinaria)",
+            "categoria": "primer_otorgamiento",
+            "descripcion": "Licencia para operar maquinaria pesada",
+            "duracion_estimada": "40 minutos"
+        },
+        {
+            "id": "primer_otorg_clase_e",
+            "nombre": "Primer Otorgamiento - Clase E (Tracción Animal)",
+            "categoria": "primer_otorgamiento",
+            "descripcion": "Licencia para vehículos de tracción animal",
+            "duracion_estimada": "30 minutos"
+        },
+        {
+            "id": "primer_otorg_clase_f",
+            "nombre": "Primer Otorgamiento - Clase F",
+            "categoria": "primer_otorgamiento",
+            "descripcion": "Licencia especial clase F",
+            "duracion_estimada": "35 minutos"
+        },
+        
+        # PRIMER OTORGAMIENTO - PROFESIONALES
+        {
+            "id": "primer_otorg_clase_a1",
+            "nombre": "Primer Otorgamiento - Clase A1 (Taxis)",
+            "categoria": "primer_otorgamiento_profesional",
+            "descripcion": "Licencia profesional para conducir taxis",
+            "duracion_estimada": "60 minutos"
+        },
+        {
+            "id": "primer_otorg_clase_a2",
+            "nombre": "Primer Otorgamiento - Clase A2 (Transporte Medianos)",
+            "categoria": "primer_otorgamiento_profesional",
+            "descripcion": "Licencia para transporte de pasajeros medianos",
+            "duracion_estimada": "60 minutos"
+        },
+        {
+            "id": "primer_otorg_clase_a3",
+            "nombre": "Primer Otorgamiento - Clase A3 (Buses)",
+            "categoria": "primer_otorgamiento_profesional",
+            "descripcion": "Licencia profesional para conducir buses",
+            "duracion_estimada": "60 minutos"
+        },
+        {
+            "id": "primer_otorg_clase_a4",
+            "nombre": "Primer Otorgamiento - Clase A4 (Camiones Simples)",
+            "categoria": "primer_otorgamiento_profesional",
+            "descripcion": "Licencia para camiones de carga simples",
+            "duracion_estimada": "60 minutos"
+        },
+        {
+            "id": "primer_otorg_clase_a5",
+            "nombre": "Primer Otorgamiento - Clase A5 (Camiones Articulados)",
+            "categoria": "primer_otorgamiento_profesional",
+            "descripcion": "Licencia para camiones articulados",
+            "duracion_estimada": "60 minutos"
+        },
+        
+        # RENOVACIÓN Y CONTROL
+        {
+            "id": "renovacion_licencia",
+            "nombre": "Renovación de Licencia de Conducir",
+            "categoria": "renovacion",
+            "descripcion": "Renovación de licencia vigente o vencida",
+            "duracion_estimada": "30 minutos"
+        },
+        {
+            "id": "duplicado_licencia",
+            "nombre": "Duplicado de Licencia",
+            "categoria": "duplicado",
+            "descripcion": "Solicitud de duplicado por pérdida o robo",
+            "duracion_estimada": "20 minutos"
+        },
+        {
+            "id": "canje_licencia_extranjera",
+            "nombre": "Canje de Licencia Extranjera",
+            "categoria": "canje",
+            "descripcion": "Canje de licencia extranjera por chilena",
+            "duracion_estimada": "40 minutos"
+        },
+        {
+            "id": "licencia_diplomatico",
+            "nombre": "Licencia de Diplomático",
+            "categoria": "especial",
+            "descripcion": "Licencia especial para personal diplomático",
+            "duracion_estimada": "30 minutos"
+        },
+        {
+            "id": "cambio_domicilio",
+            "nombre": "Cambio de Domicilio",
+            "categoria": "modificacion",
+            "descripcion": "Actualización de domicilio en licencia",
+            "duracion_estimada": "15 minutos"
+        },
+        {
+            "id": "cambio_restriccion",
+            "nombre": "Cambio de Restricción",
+            "categoria": "modificacion",
+            "descripcion": "Modificación de restricciones en licencia",
+            "duracion_estimada": "20 minutos"
+        },
+        
+        # OTROS TRÁMITES MUNICIPALES
         {
             "id": "permiso_circulacion",
             "nombre": "Permiso de Circulación",
             "descripcion": "Trámite de permiso de circulación vehicular",
+            "categoria": "otros",
             "duracion_estimada": "15 minutos"
         },
         {
             "id": "certificado_residencia",
             "nombre": "Certificado de Residencia",
             "descripcion": "Certificado que acredita residencia en la comuna",
+            "categoria": "otros",
             "duracion_estimada": "10 minutos"
         },
         {
             "id": "patente_comercial",
             "nombre": "Patente Comercial",
             "descripcion": "Solicitud o renovación de patente comercial",
+            "categoria": "otros",
             "duracion_estimada": "45 minutos"
         },
         {
             "id": "permiso_edificacion",
             "nombre": "Permiso de Edificación",
             "descripcion": "Permisos para construcción y edificación",
+            "categoria": "otros",
             "duracion_estimada": "60 minutos"
         },
         {
             "id": "registro_civil",
             "nombre": "Registro Civil",
             "descripcion": "Trámites de registro civil (certificados, matrimonio, etc.)",
+            "categoria": "otros",
             "duracion_estimada": "20 minutos"
         },
         {
             "id": "subsidios",
             "nombre": "Subsidios Municipales",
             "descripcion": "Solicitud de subsidios y beneficios municipales",
+            "categoria": "otros",
             "duracion_estimada": "40 minutos"
         },
         {
             "id": "otros",
             "nombre": "Otros Trámites",
             "descripcion": "Otros trámites municipales no especificados",
+            "categoria": "otros",
             "duracion_estimada": "30 minutos"
         }
     ]
     return tipos_tramites
+
+@app.post("/validar-requisitos-tramite")
+async def validar_requisitos_tramite_endpoint(
+    data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    🔍 RF05: Valida si un usuario cumple los requisitos para realizar un tipo de trámite.
+    
+    Consulta los datos municipales del usuario desde el servicio de autenticación
+    y valida contra los requisitos configurados para el tipo de trámite.
+    
+    Body:
+        {
+            "tipo_tramite": "licencia_conducir",
+            "user_id": 123  # Opcional, si no se envía usa current_user
+        }
+    
+    Returns:
+        {
+            "puede_realizar": bool,
+            "bloqueantes": [...],
+            "advertencias": [...],
+            "informativos": [...],
+            "documentos_requeridos": [...]
+        }
+    """
+    from requisitos_tramites import validar_requisitos_tramite
+    
+    tipo_tramite = data.get("tipo_tramite")
+    user_id = data.get("user_id", current_user.get("user_id"))
+    
+    if not tipo_tramite:
+        raise HTTPException(
+            status_code=400,
+            detail="Debe especificar el tipo de trámite"
+        )
+    
+    try:
+        # Consultar datos municipales del usuario desde el servicio de autenticación
+        AUTH_SERVICE_URL = "http://auth-service-1:8000"
+        
+        async with httpx.AsyncClient() as client:
+            # Obtener el token del header Authorization
+            token = data.get("token")
+            if not token:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Token de autenticación requerido"
+                )
+            
+            response = await client.get(
+                f"{AUTH_SERVICE_URL}/consultar-datos-municipales",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=10.0
+            )
+            
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail="Error al obtener datos municipales del usuario"
+                )
+            
+            datos_response = response.json()
+            datos_municipales = datos_response.get("datos_municipales", {})
+        
+        # Validar requisitos
+        resultado = validar_requisitos_tramite(tipo_tramite, datos_municipales)
+        
+        logger.info(f"✅ Validación de requisitos para {tipo_tramite} - Usuario {user_id}: {resultado['puede_realizar']}")
+        
+        return {
+            **resultado,
+            "tipo_tramite": tipo_tramite,
+            "user_id": user_id
+        }
+        
+    except httpx.RequestError as e:
+        logger.error(f"❌ Error conectando con servicio de autenticación: {str(e)}")
+        raise HTTPException(
+            status_code=503,
+            detail="Error al conectar con el servicio de autenticación"
+        )
+    except Exception as e:
+        logger.error(f"❌ Error validando requisitos: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al validar requisitos: {str(e)}"
+        )
 
 @app.get("/check-availability/{fecha}/{hora}/{tipo_tramite}")
 def check_availability(

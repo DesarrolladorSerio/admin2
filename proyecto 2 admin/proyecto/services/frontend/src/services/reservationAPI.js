@@ -58,6 +58,22 @@ class ReservationAPI {
     return response.data;
   }
 
+  /**
+   * 🔍 RF05: Valida si el usuario cumple los requisitos para un tipo de trámite
+   * @param {string} tipoTramite - ID del tipo de trámite
+   * @param {number} userId - ID del usuario (opcional)
+   * @returns {Promise<Object>} Resultado de validación con bloqueantes, advertencias, documentos, etc.
+   */
+  async validarRequisitos(tipoTramite, userId = null) {
+    const token = localStorage.getItem('authToken');
+    const response = await apiClient.post('/validar-requisitos-tramite', {
+      tipo_tramite: tipoTramite,
+      user_id: userId,
+      token: token
+    });
+    return response.data;
+  }
+
   // Método específico para admin/empleados
   async getAllReservationsDetailed() {
     const response = await apiClient.get('/admin/reservations');

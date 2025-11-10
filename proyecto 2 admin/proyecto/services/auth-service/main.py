@@ -553,14 +553,18 @@ async def confirm_password_reset(
 @app.get("/consultar-datos-municipales")
 async def consultar_datos_municipales(
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    force_refresh: bool = False  # Parámetro opcional para forzar actualización
 ):
     """
-    🏛️ Endpoint que simula consulta a bases de datos municipales
-    Retorna información de licencias, permisos, patentes, JPL y aseo del usuario actual.
+    🏛️ Endpoint que consulta datos municipales del usuario.
+    - Primera vez: Consulta sistemas externos y guarda en BD
+    - Siguientes veces: Retorna datos desde BD (más rápido)
+    - force_refresh=true: Fuerza actualización desde sistemas externos
     """
     try:
-        # El current_user ya es el objeto User completo
+        from db_auth import get_datos_municipales_by_user_id, update_datos_municipales
+        
         user = current_user
         
         if not user or not user.rut:
@@ -568,6 +572,46 @@ async def consultar_datos_municipales(
                 status_code=400,
                 detail="Usuario no tiene RUT registrado para consultar bases municipales"
             )
+        
+        # Verificar si ya existen datos en BD
+        datos_bd = get_datos_municipales_by_user_id(session, user.id)
+        
+        # Si existen y no se fuerza refresh, retornar desde BD (rápido)
+        if datos_bd and not force_refresh:
+            import json
+            logger.info(f"✅ Datos municipales obtenidos desde BD para RUT: {user.rut}")
+            
+            return {
+                "success": True,
+                "mensaje": "Datos obtenidos desde base de datos",
+                "origen": "base_datos",
+                "ultima_actualizacion": datos_bd.fecha_ultima_actualizacion.isoformat(),
+                "usuario": {
+                    "nombre": user.nombre,
+                    "email": user.email,
+                    "rut": user.rut
+                },
+                "datos_municipales": {
+                    "licencia_conducir": {
+                        "vigente": datos_bd.licencia_vigente,
+                        "numero": datos_bd.licencia_numero,
+                        "fecha_vencimiento": datos_bd.licencia_fecha_vencimiento,
+                        "categorias": json.loads(datos_bd.licencia_categorias) if datos_bd.licencia_categorias else [],
+                        "multas_pendientes": datos_bd.licencia_multas_pendientes
+                    },
+                    "permisos_edificacion": json.loads(datos_bd.permisos_construccion) if datos_bd.permisos_construccion else [],
+                    "patentes_comerciales": json.loads(datos_bd.patentes_comerciales) if datos_bd.patentes_comerciales else [],
+                    "multas_jpl": json.loads(datos_bd.jpl_multas) if datos_bd.jpl_multas else [],
+                    "servicio_aseo": {
+                        "estado_pago": datos_bd.aseo_estado_pago,
+                        "deuda_total": datos_bd.aseo_deuda_total,
+                        "proximo_vencimiento": datos_bd.aseo_proximo_vencimiento
+                    }
+                }
+            }
+        
+        # Si no existen o se fuerza refresh, consultar sistemas externos
+        logger.info(f"🔄 Consultando sistemas externos para RUT: {user.rut}")
         
         # Simular delay de consulta a sistemas externos (1-2 segundos)
         import asyncio
@@ -579,11 +623,15 @@ async def consultar_datos_municipales(
         # Realizar la "consulta" a las bases municipales
         datos_municipales = simular_consulta_municipal(user.rut)
         
-        logger.info(f"✅ Consulta municipal realizada para RUT: {user.rut}")
+        # Guardar/actualizar en BD
+        update_datos_municipales(session, user.id, datos_municipales)
+        
+        logger.info(f"✅ Consulta municipal realizada y guardada en BD para RUT: {user.rut}")
         
         return {
             "success": True,
-            "mensaje": "Consulta realizada exitosamente",
+            "mensaje": "Consulta realizada exitosamente desde sistemas externos",
+            "origen": "sistemas_externos",
             "usuario": {
                 "nombre": user.nombre,
                 "email": user.email,

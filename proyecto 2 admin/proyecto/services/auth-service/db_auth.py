@@ -38,6 +38,43 @@ class User(SQLModel, table=True):
     nombre: str = Field(default="user")
     hashed_password: str = Field()                  # Contraseña hasheada
     role: str = Field(default="user")              # Rol del usuario (admin, user, employee)
+    telefono: str | None = Field(default=None)     # Teléfono del usuario
+    direccion: str | None = Field(default=None)    # Dirección del usuario
+
+class DatosMunicipales(SQLModel, table=True):
+    """Datos municipales del ciudadano obtenidos de sistemas externos."""
+    __tablename__ = "datos_municipales"
+    
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", unique=True)
+    rut: str = Field(index=True)
+    
+    # Licencia de Conducir
+    licencia_vigente: bool = Field(default=False)
+    licencia_numero: str | None = Field(default=None)
+    licencia_fecha_vencimiento: str | None = Field(default=None)
+    licencia_categorias: str | None = Field(default=None)  # JSON string
+    licencia_multas_pendientes: int = Field(default=0)
+    
+    # Permisos de Edificación
+    permisos_construccion: str | None = Field(default=None)  # JSON string - lista de permisos
+    
+    # Patentes Comerciales
+    patentes_comerciales: str | None = Field(default=None)  # JSON string - lista de patentes
+    
+    # Juzgado de Policía Local (JPL)
+    jpl_multas_pendientes: int = Field(default=0)
+    jpl_monto_total_deuda: float = Field(default=0.0)
+    jpl_multas: str | None = Field(default=None)  # JSON string - lista de multas
+    
+    # Servicio de Aseo
+    aseo_estado_pago: str = Field(default="al_dia")  # al_dia, moroso
+    aseo_deuda_total: float = Field(default=0.0)
+    aseo_proximo_vencimiento: str | None = Field(default=None)
+    
+    # Metadatos
+    fecha_ultima_actualizacion: datetime = Field(default_factory=datetime.utcnow)
+    fecha_creacion: datetime = Field(default_factory=datetime.utcnow)
 
 
 
@@ -132,3 +169,83 @@ def init_default_users(session: Session):
             role="admin"
         )
         print("✅ Usuario admin creado: admin@municipalidad.cl / admin123")
+
+# =============================================================================
+# FUNCIONES PARA DATOS MUNICIPALES
+# =============================================================================
+
+def get_datos_municipales_by_user_id(session: Session, user_id: int) -> DatosMunicipales | None:
+    """Obtiene los datos municipales de un usuario por su ID."""
+    statement = select(DatosMunicipales).where(DatosMunicipales.user_id == user_id)
+    return session.exec(statement).first()
+
+def get_datos_municipales_by_rut(session: Session, rut: str) -> DatosMunicipales | None:
+    """Obtiene los datos municipales de un usuario por su RUT."""
+    statement = select(DatosMunicipales).where(DatosMunicipales.rut == rut)
+    return session.exec(statement).first()
+
+def create_datos_municipales(session: Session, user_id: int, rut: str, datos: dict) -> DatosMunicipales:
+    """Crea un registro de datos municipales para un usuario."""
+    import json
+    
+    datos_municipales = DatosMunicipales(
+        user_id=user_id,
+        rut=rut,
+        # Licencia de Conducir
+        licencia_vigente=datos.get("licencia", {}).get("vigente", False),
+        licencia_numero=datos.get("licencia", {}).get("numero"),
+        licencia_fecha_vencimiento=datos.get("licencia", {}).get("fecha_vencimiento"),
+        licencia_categorias=json.dumps(datos.get("licencia", {}).get("categorias", [])),
+        licencia_multas_pendientes=datos.get("licencia", {}).get("multas_pendientes", 0),
+        # Permisos de Edificación
+        permisos_construccion=json.dumps(datos.get("permisos_edificacion", [])),
+        # Patentes Comerciales
+        patentes_comerciales=json.dumps(datos.get("patentes_comerciales", [])),
+        # JPL
+        jpl_multas_pendientes=len(datos.get("multas_jpl", [])),
+        jpl_monto_total_deuda=sum(m.get("monto", 0) for m in datos.get("multas_jpl", [])),
+        jpl_multas=json.dumps(datos.get("multas_jpl", [])),
+        # Servicio de Aseo
+        aseo_estado_pago=datos.get("servicio_aseo", {}).get("estado_pago", "al_dia"),
+        aseo_deuda_total=datos.get("servicio_aseo", {}).get("deuda_total", 0.0),
+        aseo_proximo_vencimiento=datos.get("servicio_aseo", {}).get("proximo_vencimiento")
+    )
+    
+    session.add(datos_municipales)
+    session.commit()
+    session.refresh(datos_municipales)
+    return datos_municipales
+
+def update_datos_municipales(session: Session, user_id: int, datos: dict) -> DatosMunicipales:
+    """Actualiza los datos municipales de un usuario."""
+    import json
+    
+    datos_municipales = get_datos_municipales_by_user_id(session, user_id)
+    
+    if not datos_municipales:
+        # Si no existe, obtener el RUT del usuario y crear
+        user = session.get(User, user_id)
+        if not user:
+            raise ValueError(f"Usuario con ID {user_id} no encontrado")
+        return create_datos_municipales(session, user_id, user.rut, datos)
+    
+    # Actualizar campos existentes
+    datos_municipales.licencia_vigente = datos.get("licencia", {}).get("vigente", False)
+    datos_municipales.licencia_numero = datos.get("licencia", {}).get("numero")
+    datos_municipales.licencia_fecha_vencimiento = datos.get("licencia", {}).get("fecha_vencimiento")
+    datos_municipales.licencia_categorias = json.dumps(datos.get("licencia", {}).get("categorias", []))
+    datos_municipales.licencia_multas_pendientes = datos.get("licencia", {}).get("multas_pendientes", 0)
+    datos_municipales.permisos_construccion = json.dumps(datos.get("permisos_edificacion", []))
+    datos_municipales.patentes_comerciales = json.dumps(datos.get("patentes_comerciales", []))
+    datos_municipales.jpl_multas_pendientes = len(datos.get("multas_jpl", []))
+    datos_municipales.jpl_monto_total_deuda = sum(m.get("monto", 0) for m in datos.get("multas_jpl", []))
+    datos_municipales.jpl_multas = json.dumps(datos.get("multas_jpl", []))
+    datos_municipales.aseo_estado_pago = datos.get("servicio_aseo", {}).get("estado_pago", "al_dia")
+    datos_municipales.aseo_deuda_total = datos.get("servicio_aseo", {}).get("deuda_total", 0.0)
+    datos_municipales.aseo_proximo_vencimiento = datos.get("servicio_aseo", {}).get("proximo_vencimiento")
+    datos_municipales.fecha_ultima_actualizacion = datetime.utcnow()
+    
+    session.add(datos_municipales)
+    session.commit()
+    session.refresh(datos_municipales)
+    return datos_municipales
