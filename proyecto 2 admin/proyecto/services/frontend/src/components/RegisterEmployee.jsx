@@ -2,6 +2,57 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import authAPI from '../services/authAPI';
 
+// Componentes movidos FUERA del componente principal para evitar pérdida de foco
+const InputField = ({ label, type = 'text', name, value, onChange, required = true, ...props }) => (
+    <div style={{ marginBottom: '15px' }}>
+        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+            {label} {required && '*'}
+        </label>
+        <input
+            type={type}
+            name={name}
+            value={value}
+            onChange={onChange}
+            required={required}
+            style={{
+                width: '100%',
+                padding: '10px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '14px'
+            }}
+            {...props}
+        />
+    </div>
+);
+
+const SelectField = ({ label, name, value, onChange, options, required = true }) => (
+    <div style={{ marginBottom: '15px' }}>
+        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+            {label} {required && '*'}
+        </label>
+        <select
+            name={name}
+            value={value}
+            onChange={onChange}
+            required={required}
+            style={{
+                width: '100%',
+                padding: '10px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '14px'
+            }}
+        >
+            {options.map(option => (
+                <option key={option.value} value={option.value}>
+                    {option.label}
+                </option>
+            ))}
+        </select>
+    </div>
+);
+
 // Principio de Responsabilidad Única: Este componente se encarga únicamente del registro de empleados
 export default function RegisterEmployee() {
     const navigate = useNavigate();
@@ -113,57 +164,6 @@ export default function RegisterEmployee() {
         }
     };
 
-    // Principio de Composición: dividir la UI en componentes más pequeños
-    const InputField = ({ label, type = 'text', name, value, required = true, ...props }) => (
-        <div style={{ marginBottom: '15px' }}>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                {label} {required && '*'}
-            </label>
-            <input
-                type={type}
-                name={name}
-                value={value}
-                onChange={handleInputChange}
-                required={required}
-                style={{
-                    width: '100%',
-                    padding: '10px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    fontSize: '14px'
-                }}
-                {...props}
-            />
-        </div>
-    );
-
-    const SelectField = ({ label, name, value, options, required = true }) => (
-        <div style={{ marginBottom: '15px' }}>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                {label} {required && '*'}
-            </label>
-            <select
-                name={name}
-                value={value}
-                onChange={handleInputChange}
-                required={required}
-                style={{
-                    width: '100%',
-                    padding: '10px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    fontSize: '14px'
-                }}
-            >
-                {options.map(option => (
-                    <option key={option.value} value={option.value}>
-                        {option.label}
-                    </option>
-                ))}
-            </select>
-        </div>
-    );
-
     return (
         <div style={{ padding: '20px', maxWidth: '600px', margin: '20px auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px' }}>
@@ -223,6 +223,7 @@ export default function RegisterEmployee() {
                     type="email"
                     name="email"
                     value={formData.email}
+                    onChange={handleInputChange}
                     placeholder="empleado@municipalidad.cl"
                 />
 
@@ -230,6 +231,7 @@ export default function RegisterEmployee() {
                     label="👤 Nombre Completo"
                     name="nombre"
                     value={formData.nombre}
+                    onChange={handleInputChange}
                     placeholder="Ej: Juan Pérez González"
                 />
 
@@ -237,6 +239,7 @@ export default function RegisterEmployee() {
                     label="🆔 RUT"
                     name="rut"
                     value={formData.rut}
+                    onChange={handleInputChange}
                     placeholder="12345678-9"
                 />
 
@@ -245,6 +248,7 @@ export default function RegisterEmployee() {
                     type="password"
                     name="password"
                     value={formData.password}
+                    onChange={handleInputChange}
                     placeholder="Mínimo 8 caracteres"
                 />
 
@@ -256,6 +260,7 @@ export default function RegisterEmployee() {
                     label="💼 Cargo"
                     name="cargo"
                     value={formData.cargo}
+                    onChange={handleInputChange}
                     placeholder="Ej: Analista de Sistemas"
                 />
 
@@ -263,6 +268,7 @@ export default function RegisterEmployee() {
                     label="🏢 Departamento"
                     name="departamento"
                     value={formData.departamento}
+                    onChange={handleInputChange}
                     placeholder="Ej: Informática"
                 />
 
@@ -271,12 +277,14 @@ export default function RegisterEmployee() {
                     type="date"
                     name="fecha_ingreso"
                     value={formData.fecha_ingreso}
+                    onChange={handleInputChange}
                 />
 
                 <SelectField
                     label="📄 Tipo de Contrato"
                     name="tipo_contrato"
                     value={formData.tipo_contrato}
+                    onChange={handleInputChange}
                     options={[
                         { value: 'planta', label: 'Planta' },
                         { value: 'contrata', label: 'Contrata' },

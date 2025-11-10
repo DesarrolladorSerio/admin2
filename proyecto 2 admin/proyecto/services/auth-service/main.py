@@ -18,7 +18,6 @@ from db_auth import (
     init_default_users,
 )
 from fastapi import Depends, FastAPI, HTTPException, status
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel, EmailStr
@@ -38,16 +37,15 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-app = FastAPI()
-
-# Configurar CORS para permitir peticiones desde el frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], # Permitir todos los orígenes para depuración
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+# FastAPI sin middlewares - Nginx maneja CORS y routing
+app = FastAPI(
+    title="Auth Service",
+    description="Servicio de autenticación - CORS manejado por Nginx Gateway",
+    version="1.0.0"
 )
+
+# NOTA: CORS removido - Nginx API Gateway maneja los headers CORS
+# NOTA: Las peticiones llegan pre-procesadas por Nginx con headers correctos
 # =============================================================================
 # MODELOS DE DATOS (Pydantic)
 # =============================================================================
@@ -119,10 +117,11 @@ def verify_token(token: str = Depends(oauth2_scheme)):
         raise credentials_exception
 
 def get_current_user(
-    username: str = Depends(verify_token),
+    token_data: dict = Depends(verify_token),
     session: Session = Depends(get_session)
 ) -> User:
     """Obtiene el usuario actual basado en el token."""
+    username = token_data["username"]
     user = get_user_by_username(session, username)
     if user is None:
         raise HTTPException(

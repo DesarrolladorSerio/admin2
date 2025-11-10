@@ -23,8 +23,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 512M
+          cpus: "0.3"
+          memory: 128M
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${AUTH_DB_USER} -d ${AUTH_DB_NAME}"]
       interval: 10s
@@ -99,8 +99,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 512M
+          cpus: "0.3"
+          memory: 128M
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${RESERVATIONS_DB_USER} -d ${RESERVATIONS_DB_NAME}"]
       interval: 10s
@@ -147,8 +147,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 512M
+          cpus: "0.2"
+          memory: 64M
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h localhost -p 5432"]
       interval: 10s
@@ -179,8 +179,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 512M
+          cpus: "0.3"
+          memory: 128M
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DOCUMENTS_DB_USER:-postgres} -d ${DOCUMENTS_DB_NAME:-documents}"]
       interval: 10s
@@ -208,15 +208,15 @@ services:
       REPLICATION_USER: replicator
       REPLICATION_PASSWORD: replica_pass
     ports:
-      - "${CHATBOT_DB_PORT:-5435}:5432"
+      - "${CHATBOT_DB_PORT:-5436}:5432"
     volumes:
       - chatbot_primary_data:/var/lib/postgresql/data
       - ./infrastructure/postgres/chatbot-init:/docker-entrypoint-initdb.d
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 512M
+          cpus: "0.3"
+          memory: 128M
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${CHATBOT_DB_USER:-admin} -d ${CHATBOT_DB_NAME:-chatbot_db}"]
       interval: 10s
@@ -256,6 +256,11 @@ services:
         exec docker-entrypoint.sh postgres
     volumes:
       - documents_replica_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 64M
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h localhost -p 5432"]
       interval: 10s
@@ -294,6 +299,11 @@ services:
         exec docker-entrypoint.sh postgres
     volumes:
       - chatbot_replica_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 64M
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h localhost -p 5432"]
       interval: 10s
@@ -322,8 +332,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 512M
+          cpus: "0.3"
+          memory: 256M
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s
@@ -352,8 +362,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 512M
+          cpus: "0.2"
+          memory: 64M
     restart: unless-stopped
     networks:
       backend_net:
@@ -376,16 +386,17 @@ services:
     environment:
       DATABASE_URL: "postgresql+psycopg://${AUTH_DB_USER}:${AUTH_DB_PASSWORD}@auth-db:5432/${AUTH_DB_NAME}"
       PORT: 8000
-    ports:
-      - "${AUTH_SERVICE_PORT}:8000"
+    # Puerto NO expuesto al host - solo accesible via nginx
+    expose:
+      - "8000"
     depends_on:
       auth-db:
         condition: service_healthy
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 512M
+          cpus: "0.3"
+          memory: 256M
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
       interval: 10s
@@ -414,8 +425,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 512M
+          cpus: "0.3"
+          memory: 256M
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
       interval: 10s
@@ -440,16 +451,17 @@ services:
     environment:
       DATABASE_URL: "postgresql+psycopg://${RESERVATIONS_DB_USER}:${RESERVATIONS_DB_PASSWORD}@reservations-db-primary:5432/${RESERVATIONS_DB_NAME}"
       PORT: 8002
-    ports:
-      - "${RESERVATIONS_SERVICE_PORT}:8002"
+    # Puerto NO expuesto al host - solo accesible via nginx
+    expose:
+      - "8002"
     depends_on:
       reservations-db-primary:
         condition: service_healthy
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 512M
+          cpus: "0.3"
+          memory: 256M
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8002/health"]
       interval: 10s
@@ -478,8 +490,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 512M
+          cpus: "0.3"
+          memory: 256M
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8002/health"]
       interval: 10s
@@ -511,8 +523,9 @@ services:
       AUTH_SERVICE_URL: "http://auth-service-1:8000"
       SECRET_KEY: "un-secreto-muy-fuerte-y-largo"
       ALGORITHM: "HS256"
-    ports:
-      - "${DOCUMENTS_SERVICE_PORT:-8003}:8003"
+    # Puerto NO expuesto al host - solo accesible via nginx
+    expose:
+      - "8003"
     depends_on:
       documents-db:
         condition: service_healthy
@@ -521,8 +534,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 512M
+          cpus: "0.3"
+          memory: 256M
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8003/health"]
       interval: 10s
@@ -562,16 +575,17 @@ services:
       DOCUMENTS_SERVICE_URL: "http://documents-service:8003"
       SECRET_KEY: "un-secreto-muy-fuerte-y-largo"
       ALGORITHM: "HS256"
-    ports:
-      - "${NOTIFICATIONS_SERVICE_PORT:-8004}:8004"
+    # Puerto NO expuesto al host - solo accesible via nginx
+    expose:
+      - "8004"
     depends_on:
       redis:
         condition: service_healthy
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 512M
+          cpus: "0.3"
+          memory: 256M
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
       interval: 10s
@@ -613,8 +627,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 512M
+          cpus: "0.3"
+          memory: 256M
     healthcheck:
       test: ["CMD", "celery", "-A", "celery_config", "inspect", "ping"]
       interval: 30s
@@ -649,8 +663,9 @@ services:
       SECRET_KEY: "un-secreto-muy-fuerte-y-largo"
       ALGORITHM: "HS256"
       PORT: 8005
-    ports:
-      - "${CHATBOT_SERVICE_PORT:-8005}:8005"
+    # Puerto NO expuesto al host - solo accesible via nginx
+    expose:
+      - "8005"
     depends_on:
       chatbot-db:
         condition: service_healthy
@@ -661,8 +676,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 512M
+          cpus: "0.3"
+          memory: 256M
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8005/health"]
       interval: 10s
@@ -706,8 +721,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 512M
+          cpus: "0.3"
+          memory: 256M
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8005/health"]
       interval: 10s
@@ -732,8 +747,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "2.0"
-          memory: 4G
+          cpus: "1.0"
+          memory: 2G
     restart: unless-stopped
     networks:
       - backend_net
@@ -769,8 +784,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 512M
+          cpus: "0.2"
+          memory: 128M
     restart: unless-stopped
     networks:
       - frontend_net
@@ -820,8 +835,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 512M
+          cpus: "0.2"
+          memory: 128M
     restart: unless-stopped
 
   # ==========================
@@ -884,6 +899,11 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 128M
     networks:
       - database_net
       - storage_net
@@ -901,6 +921,11 @@ services:
       - prometheus_data:/prometheus
     ports:
       - "9090:9090"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: 256M
     networks:
       - backend_net
       - prometheus_net
@@ -914,6 +939,11 @@ services:
       - ./infrastructure/monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     ports:
       - "9093:9093"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 128M
     networks:
       - prometheus_net
       - backend_net
@@ -935,6 +965,11 @@ services:
       - "3001:3000"
     depends_on:
       - prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: 256M
     networks:
       - backend_net
       - prometheus_net
@@ -952,6 +987,11 @@ services:
       - /:/rootfs:ro
     ports:
       - "9100:9100"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 64M
     networks:
       - backend_net
       - prometheus_net
@@ -965,6 +1005,11 @@ services:
       - REDIS_ADDR=redis:6379
     ports:
       - "9121:9121"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 32M
     networks:
       - backend_net
       - prometheus_net
@@ -978,6 +1023,11 @@ services:
       DATA_SOURCE_NAME: "postgresql://admin:admin@auth-db:5432/auth_db?sslmode=disable"
     ports:
       - "9187:9187"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 32M
     networks:
       - backend_net
       - prometheus_net
@@ -993,6 +1043,11 @@ services:
       WEB_LISTEN_ADDRESS: ":9188"
     ports:
       - "9188:9187"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 32M
     networks:
       - backend_net
       - prometheus_net
@@ -1008,6 +1063,11 @@ services:
       WEB_LISTEN_ADDRESS: ":9189"
     ports:
       - "9189:9187"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 32M
     networks:
       - backend_net
       - prometheus_net
@@ -1023,6 +1083,11 @@ services:
       WEB_LISTEN_ADDRESS: ":9190"
     ports:
       - "9190:9187"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 32M
     networks:
       - backend_net
       - prometheus_net

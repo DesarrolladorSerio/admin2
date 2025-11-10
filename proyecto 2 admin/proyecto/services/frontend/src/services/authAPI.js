@@ -115,6 +115,32 @@ class AuthAPI {
   getToken() {
     return localStorage.getItem('authToken');
   }
+
+  // 📧 Funciones de recuperación de contraseña
+  async requestPasswordReset(email) {
+    try {
+      const response = await authClient.post('/password-reset/request', {
+        email: email
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error solicitando recuperación de contraseña:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  async confirmPasswordReset(token, newPassword) {
+    try {
+      const response = await authClient.post('/password-reset/confirm', {
+        token: token,
+        new_password: newPassword
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error confirmando nueva contraseña:', error.response?.data || error.message);
+      throw error;
+    }
+  }
 }
 
 export default new AuthAPI();

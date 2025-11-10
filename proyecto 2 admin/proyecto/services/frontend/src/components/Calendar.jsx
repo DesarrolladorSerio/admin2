@@ -181,39 +181,44 @@ export default function Calendar({
                   </div>
                 </div>
 
-                {currentUser && currentUser.id === reservation.usuario_id && (
-                  <div style={{ display: 'flex', gap: '5px' }}>
-                    <button
-                      onClick={() => onEditReservation(reservation)}
-                      style={{
-                        padding: '5px 10px',
-                        backgroundColor: '#ffc107',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '3px',
-                        cursor: 'pointer',
-                        fontSize: '12px'
-                      }}
-                    >
-                      ✏️ Editar
-                    </button>
+                {/* Mostrar botones si es el propietario O si es admin/employee */}
+                {currentUser && (
+                  currentUser.id === reservation.usuario_id ||
+                  currentUser.role === 'admin' ||
+                  currentUser.role === 'employee'
+                ) && (
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                      <button
+                        onClick={() => onEditReservation(reservation)}
+                        style={{
+                          padding: '5px 10px',
+                          backgroundColor: '#ffc107',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '3px',
+                          cursor: 'pointer',
+                          fontSize: '12px'
+                        }}
+                      >
+                        ✏️ Editar
+                      </button>
 
-                    <button
-                      onClick={() => onDeleteReservation(reservation.id)}
-                      style={{
-                        padding: '5px 10px',
-                        backgroundColor: '#dc3545',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '3px',
-                        cursor: 'pointer',
-                        fontSize: '12px'
-                      }}
-                    >
-                      🗑️ Eliminar
-                    </button>
-                  </div>
-                )}
+                      <button
+                        onClick={() => onDeleteReservation(reservation.id)}
+                        style={{
+                          padding: '5px 10px',
+                          backgroundColor: '#dc3545',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '3px',
+                          cursor: 'pointer',
+                          fontSize: '12px'
+                        }}
+                      >
+                        🗑️ Eliminar
+                      </button>
+                    </div>
+                  )}
               </div>
             </div>
           ))

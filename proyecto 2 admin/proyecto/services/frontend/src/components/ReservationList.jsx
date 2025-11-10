@@ -174,45 +174,50 @@ export default function ReservationList({
                 </div>
               </div>
 
-              {currentUser && currentUser.id === reservation.usuario_id && (
-                <div style={{
-                  display: 'flex',
-                  gap: '8px',
-                  flexWrap: 'wrap'
-                }}>
-                  <button
-                    onClick={() => onEditReservation(reservation)}
-                    style={{
-                      padding: '8px 16px',
-                      backgroundColor: '#ffc107',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: 'bold'
-                    }}
-                  >
-                    ✏️ Editar
-                  </button>
+              {/* Mostrar botones si es el propietario O si es admin/employee */}
+              {currentUser && (
+                currentUser.id === reservation.usuario_id ||
+                currentUser.role === 'admin' ||
+                currentUser.role === 'employee'
+              ) && (
+                  <div style={{
+                    display: 'flex',
+                    gap: '8px',
+                    flexWrap: 'wrap'
+                  }}>
+                    <button
+                      onClick={() => onEditReservation(reservation)}
+                      style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#ffc107',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      ✏️ Editar
+                    </button>
 
-                  <button
-                    onClick={() => onDeleteReservation(reservation.id)}
-                    style={{
-                      padding: '8px 16px',
-                      backgroundColor: '#dc3545',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: 'bold'
-                    }}
-                  >
-                    🗑️ Eliminar
-                  </button>
-                </div>
-              )}
+                    <button
+                      onClick={() => onDeleteReservation(reservation.id)}
+                      style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#dc3545',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      🗑️ Eliminar
+                    </button>
+                  </div>
+                )}
             </div>
           </div>
         ))

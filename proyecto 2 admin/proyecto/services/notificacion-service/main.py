@@ -5,7 +5,6 @@ from typing import Any, Dict, List, Optional
 import redis
 from config import settings
 from fastapi import FastAPI, HTTPException, status
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from tasks import (
     send_batch_emails_task,
@@ -25,21 +24,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Crear aplicación FastAPI
+# FastAPI sin middlewares - Nginx maneja CORS y routing
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="Servicio de notificaciones con email y sistema de colas"
+    description="Servicio de notificaciones - CORS manejado por Nginx Gateway"
 )
 
-# Configurar CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# NOTA: CORS removido - Nginx API Gateway maneja los headers CORS
 
 # Conexión a Redis
 try:

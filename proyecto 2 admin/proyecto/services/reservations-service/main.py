@@ -15,7 +15,6 @@ from db_reservas import (
     update_reservation,
 )
 from fastapi import Depends, FastAPI, HTTPException, status
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlmodel import Session
 
@@ -23,16 +22,14 @@ from sqlmodel import Session
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Reservations API")
-
-# Configurar CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+# FastAPI sin middlewares - Nginx maneja CORS y routing
+app = FastAPI(
+    title="Reservations API",
+    description="Servicio de reservaciones - CORS manejado por Nginx Gateway",
+    version="1.0.0"
 )
+
+# NOTA: CORS removido - Nginx API Gateway maneja los headers CORS
 
 # =============================================================================
 # CONFIGURACIÓN DE LA APLICACIÓN
@@ -169,20 +166,25 @@ def get_reservations(
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
-    Obtener reservaciones según el rol del usuario:
-    - admin/employee: Ve todas las reservas
-    - user: Ve solo sus propias reservas
+    Obtener TODAS las reservaciones para TODOS los usuarios.
+    Todos pueden ver el calendario completo, pero solo pueden 
+    modificar/eliminar según sus permisos (verificado en endpoints PUT/DELETE).
     """
-    user_role = current_user.get("role", "user")
-    
-    if user_role in ["admin", "employee"]:
-        # Admin y empleados ven todas las reservas
-        reservations = get_all_reservations(session)
-    else:
-        # Usuarios solo ven sus propias reservas
-        from db_reservas import get_reservations_by_user
-        reservations = get_reservations_by_user(session, current_user["id"])
-    
+    # Todos los usuarios ven todas las reservas
+    reservations = get_all_reservations(session)
+    return reservations
+
+@app.get("/reservations/my", response_model=List[ReservationResponse])
+def get_my_reservations(
+    session: Session = Depends(get_session),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Obtener solo las reservaciones del usuario actual.
+    Endpoint específico si se necesita filtrar.
+    """
+    from db_reservas import get_reservations_by_user
+    reservations = get_reservations_by_user(session, current_user["id"])
     return reservations
 
 @app.get("/reservations/{reservation_id}", response_model=ReservationResponse)

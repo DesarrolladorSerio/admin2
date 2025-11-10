@@ -1,7 +1,9 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 const Login = () => {
+    const navigate = useNavigate();
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [err, setErr] = useState("");
@@ -20,13 +22,19 @@ const Login = () => {
                 password: password
             });
 
-            if (isLogin) {
-                setSuccess("✅ Login exitoso! Token: " + response.data.access_token.substring(0, 20) + "...");
-            } else {
-                setSuccess("✅ Usuario registrado exitosamente! Token: " + response.data.access_token.substring(0, 20) + "...");
-            }
+            // Guardar token en localStorage (usando 'authToken' para consistencia)
+            localStorage.setItem("authToken", response.data.access_token);
 
-            console.log("Token completo:", response.data.access_token);
+            if (isLogin) {
+                setSuccess("✅ Login exitoso! Redirigiendo...");
+                console.log("✅ Login exitoso. Token guardado en localStorage");
+            } else {
+                setSuccess("✅ Usuario registrado exitosamente! Redirigiendo...");
+                console.log("✅ Usuario registrado. Token guardado en localStorage");
+            }            // Redirigir al menú después de 1 segundo
+            setTimeout(() => {
+                navigate("/menu");
+            }, 1000);
 
         } catch (error) {
             if (error.response?.data?.detail) {
@@ -34,6 +42,7 @@ const Login = () => {
             } else {
                 setErr("❌ Error: " + error.message);
             }
+            console.error("❌ Error en login/registro:", error);
         }
     };
 

@@ -17,7 +17,6 @@ from fastapi import (
     UploadFile,
     status,
 )
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from storage_service import storage, validate_file_type
 
@@ -25,20 +24,14 @@ from storage_service import storage, validate_file_type
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# FastAPI sin middlewares - Nginx maneja CORS y routing
 app = FastAPI(
     title="Documents Service - Sistema Municipal", 
     version="1.0.0",
-    description="Servicio de gestión de documentos para trámites municipales"
+    description="Servicio de gestión de documentos - CORS manejado por Nginx Gateway"
 )
 
-# Configurar CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# NOTA: CORS removido - Nginx API Gateway maneja los headers CORS
 
 # =============================================================================
 # FUNCIÓN HELPER PARA NOTIFICACIONES

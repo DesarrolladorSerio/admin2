@@ -3,7 +3,6 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel
@@ -105,21 +104,15 @@ async def lifespan(app: FastAPI):
 # APLICACIÓN FASTAPI
 # =============================================================================
 
+# FastAPI sin middlewares - Nginx maneja CORS y routing
 app = FastAPI(
     title="ChatBot IA - Servicio de Asistencia Virtual",
-    description="Servicio de chatbot inteligente para el sistema de reservas de licencias",
+    description="Servicio de chatbot inteligente - CORS manejado por Nginx Gateway",
     version="1.0.0",
     lifespan=lifespan
 )
 
-# Configurar CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# NOTA: CORS removido - Nginx API Gateway maneja los headers CORS
 
 # =============================================================================
 # ENDPOINTS DEL CHATBOT

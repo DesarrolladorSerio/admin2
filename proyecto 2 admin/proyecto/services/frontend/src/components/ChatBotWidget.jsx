@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import chatbotAPI from '../services/chatbotAPI.js';
 
 export default function ChatBotWidget() {
   const [isOpen, setIsOpen] = useState(false);
@@ -15,11 +15,11 @@ export default function ChatBotWidget() {
   useEffect(() => {
     const savedSessionId = localStorage.getItem('chatbot_session_id');
     const savedMessages = localStorage.getItem('chatbot_messages');
-    
+
     if (savedSessionId) {
       setSessionId(savedSessionId);
     }
-    
+
     if (savedMessages) {
       try {
         setMessages(JSON.parse(savedMessages));
@@ -105,22 +105,9 @@ export default function ChatBotWidget() {
     setError(null);
 
     try {
-      const response = await axios.post(
-        '/api/chatbot/chat',
-        {
-          message: inputMessage,
-          session_id: sessionId,
-          context: getCurrentContext()
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      const response = await chatbotAPI.sendMessage(inputMessage, sessionId);
 
-      const { response: botResponse, session_id: newSessionId } = response.data;
+      const { response: botResponse, session_id: newSessionId } = response;
 
       // Guardar session_id si es nueva
       if (newSessionId && newSessionId !== sessionId) {
@@ -140,7 +127,7 @@ export default function ChatBotWidget() {
     } catch (err) {
       console.error('Error enviando mensaje:', err);
       let errorMessage = 'No se pudo enviar el mensaje. Por favor intenta nuevamente.';
-      
+
       if (err.response?.status === 401) {
         errorMessage = 'Tu sesión ha expirado. Por favor inicia sesión nuevamente.';
       } else if (err.response?.status === 500) {
@@ -148,7 +135,7 @@ export default function ChatBotWidget() {
       }
 
       setError(errorMessage);
-      
+
       // Agregar mensaje de error visible en el chat
       const errorMsg = {
         role: 'assistant',
@@ -175,7 +162,7 @@ export default function ChatBotWidget() {
       setSessionId(null);
       localStorage.removeItem('chatbot_session_id');
       localStorage.removeItem('chatbot_messages');
-      
+
       // Mensaje de bienvenida
       setMessages([{
         role: 'assistant',
@@ -211,9 +198,8 @@ export default function ChatBotWidget() {
       {/* Botón flotante */}
       <button
         onClick={toggleChat}
-        className={`fixed bottom-6 right-6 z-50 w-16 h-16 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 hover:scale-110 ${
-          isOpen ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
-        }`}
+        className={`fixed bottom-6 right-6 z-50 w-16 h-16 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 hover:scale-110 ${isOpen ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
+          }`}
         aria-label={isOpen ? 'Cerrar chat' : 'Abrir chat'}
       >
         {isOpen ? (
@@ -268,7 +254,7 @@ export default function ChatBotWidget() {
                 </div>
                 <p className="text-gray-600 mb-4">¡Hola! Soy tu asistente virtual.</p>
                 <p className="text-sm text-gray-500 mb-6">¿En qué puedo ayudarte hoy?</p>
-                
+
                 {/* Sugerencias rápidas */}
                 <div className="space-y-2">
                   <p className="text-xs text-gray-400 font-semibold uppercase">Preguntas frecuentes:</p>
@@ -292,13 +278,12 @@ export default function ChatBotWidget() {
               >
                 <div className={`max-w-[80%] ${msg.role === 'user' ? 'order-2' : 'order-1'}`}>
                   <div
-                    className={`rounded-lg p-3 ${
-                      msg.role === 'user'
+                    className={`rounded-lg p-3 ${msg.role === 'user'
                         ? 'bg-blue-600 text-white'
                         : msg.isError
-                        ? 'bg-red-100 text-red-800 border border-red-200'
-                        : 'bg-white text-gray-800 border border-gray-200'
-                    }`}
+                          ? 'bg-red-100 text-red-800 border border-red-200'
+                          : 'bg-white text-gray-800 border border-gray-200'
+                      }`}
                   >
                     <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                   </div>
