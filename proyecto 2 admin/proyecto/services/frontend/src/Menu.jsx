@@ -107,6 +107,14 @@ function MenuOptions({ userRole, onNavigate, onLogout }) {
                 📅 Ir a Reservas
             </MenuButton>
 
+            {/* 🏛️ NUEVO: Consulta de Datos Municipales */}
+            <MenuButton
+                onClick={() => onNavigate('/datos-municipales')}
+                background="#3498db"
+            >
+                🏛️ Mis Datos Municipales
+            </MenuButton>
+
             {/* Gestión avanzada de reservas para admin/empleados */}
             {(userRole === 'admin' || userRole === 'employee') && (
                 <MenuButton

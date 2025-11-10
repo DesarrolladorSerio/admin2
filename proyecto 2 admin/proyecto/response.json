@@ -1,0 +1,1 @@
+﻿{"detail":[{"type":"missing","loc":["body","identifier"],"msg":"Field required","input":{"email":"admin@municipal.cl","password":"Admin123!"}}]}

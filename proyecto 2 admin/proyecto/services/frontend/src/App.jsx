@@ -8,6 +8,7 @@ import AdminRoute from './components/AdminRoute';
 import DocumentsComponent from './components/DocumentsComponent';
 import RegisterEmployee from './components/RegisterEmployee';
 import ChatBotWidget from './components/ChatBotWidget';
+import DatosMunicipales from './components/DatosMunicipales';
 
 // Componente interno que usa useLocation
 function AppContent() {
@@ -31,6 +32,7 @@ function AppContent() {
         <Route path="/menu" element={<Menu />} />
         <Route path="/reservas" element={<Reservas />} />
         <Route path="/documentos" element={<DocumentsComponent />} />
+        <Route path="/datos-municipales" element={<DatosMunicipales />} />
         <Route path="/admin/register-employee" element={
           <AdminRoute>
             <RegisterEmployee />

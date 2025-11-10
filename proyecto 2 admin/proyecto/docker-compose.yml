@@ -160,21 +160,19 @@ services:
       - database_net
 
   # ==========================
-  # 🗄️ Base de datos de Documentos
+  # 🗄️ Base de datos de Documentos (SIN RÉPLICA)
   # ==========================
   documents-db:
     image: postgres:16.4
-    container_name: documents_db_primary
+    container_name: documents_db
     environment:
       POSTGRES_USER: ${DOCUMENTS_DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DOCUMENTS_DB_PASSWORD:-password}
       POSTGRES_DB: ${DOCUMENTS_DB_NAME:-documents}
-      REPLICATION_USER: replicator
-      REPLICATION_PASSWORD: replica_pass
     ports:
       - "${DOCUMENTS_DB_PORT:-5434}:5432"
     volumes:
-      - documents_primary_data:/var/lib/postgresql/data
+      - documents_data:/var/lib/postgresql/data
       - ./infrastructure/postgres/documents-init:/docker-entrypoint-initdb.d
     deploy:
       resources:
@@ -188,29 +186,25 @@ services:
       retries: 10
       start_period: 10s
     restart: unless-stopped
-    # Replicación: verificar ->
-    #   docker compose exec documents-db psql -U ${DOCUMENTS_DB_USER:-postgres} -d ${DOCUMENTS_DB_NAME:-documents} -c "SELECT client_addr,state,sync_state FROM pg_stat_replication;"
-    # Promover réplica:
-    #   docker compose exec documents-db-replica pg_ctl -D /var/lib/postgresql/data promote
     networks:
       database_net:
 
   # ==========================
   # 🗄️ Base de datos de ChatBot IA
   # ==========================
+  # 🗄️ Base de datos de ChatBot IA (SIN RÉPLICA)
+  # ==========================
   chatbot-db:
     image: postgres:16.4
-    container_name: chatbot_db_primary
+    container_name: chatbot_db
     environment:
       POSTGRES_USER: ${CHATBOT_DB_USER:-admin}
       POSTGRES_PASSWORD: ${CHATBOT_DB_PASSWORD:-admin}
       POSTGRES_DB: ${CHATBOT_DB_NAME:-chatbot_db}
-      REPLICATION_USER: replicator
-      REPLICATION_PASSWORD: replica_pass
     ports:
       - "${CHATBOT_DB_PORT:-5436}:5432"
     volumes:
-      - chatbot_primary_data:/var/lib/postgresql/data
+      - chatbot_data:/var/lib/postgresql/data
       - ./infrastructure/postgres/chatbot-init:/docker-entrypoint-initdb.d
     deploy:
       resources:
@@ -219,93 +213,6 @@ services:
           memory: 128M
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${CHATBOT_DB_USER:-admin} -d ${CHATBOT_DB_NAME:-chatbot_db}"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-    restart: unless-stopped
-    networks:
-      database_net:
-
-  documents-db-replica:
-    image: postgres:16.4
-    container_name: documents_db_replica
-    depends_on:
-      documents-db:
-        condition: service_healthy
-    environment:
-      POSTGRES_USER: ${DOCUMENTS_DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DOCUMENTS_DB_PASSWORD:-password}
-      POSTGRES_DB: ${DOCUMENTS_DB_NAME:-documents}
-      PRIMARY_HOST: documents-db
-      PRIMARY_PORT: 5432
-      REPLICATION_USER: replicator
-      REPLICATION_PASSWORD: replica_pass
-    # Replica idempotente
-    entrypoint:
-      - bash
-      - -c
-      - |
-        set -e
-        if [ ! -s "/var/lib/postgresql/data/PG_VERSION" ]; then
-          until pg_isready -h documents-db -p 5432; do sleep 2; done
-          rm -rf "/var/lib/postgresql/data"/*
-          PGPASSWORD='replica_pass' pg_basebackup -h documents-db -D "/var/lib/postgresql/data" -U replicator -Fp -Xs -P -R
-          chmod 700 "/var/lib/postgresql/data"
-        fi
-        exec docker-entrypoint.sh postgres
-    volumes:
-      - documents_replica_data:/var/lib/postgresql/data
-    deploy:
-      resources:
-        limits:
-          cpus: "0.2"
-          memory: 64M
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-    restart: unless-stopped
-    networks:
-      database_net:
-
-  chatbot-db-replica:
-    image: postgres:16.4
-    container_name: chatbot_db_replica
-    depends_on:
-      chatbot-db:
-        condition: service_healthy
-    environment:
-      POSTGRES_USER: ${CHATBOT_DB_USER:-admin}
-      POSTGRES_PASSWORD: ${CHATBOT_DB_PASSWORD:-admin}
-      POSTGRES_DB: ${CHATBOT_DB_NAME:-chatbot_db}
-      PRIMARY_HOST: chatbot-db
-      PRIMARY_PORT: 5432
-      REPLICATION_USER: replicator
-      REPLICATION_PASSWORD: replica_pass
-    entrypoint:
-      - bash
-      - -c
-      - |
-        set -e
-        if [ ! -s "/var/lib/postgresql/data/PG_VERSION" ]; then
-          until pg_isready -h chatbot-db -p 5432; do sleep 2; done
-          rm -rf "/var/lib/postgresql/data"/*
-          PGPASSWORD='replica_pass' pg_basebackup -h chatbot-db -D "/var/lib/postgresql/data" -U replicator -Fp -Xs -P -R
-          chmod 700 "/var/lib/postgresql/data"
-        fi
-        exec docker-entrypoint.sh postgres
-    volumes:
-      - chatbot_replica_data:/var/lib/postgresql/data
-    deploy:
-      resources:
-        limits:
-          cpus: "0.2"
-          memory: 64M
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -640,13 +547,13 @@ services:
       backend_net:
 
   # ==========================
-  # 🤖 Servicio de ChatBot IA (Alta Disponibilidad)
+  # 🤖 Servicio de ChatBot IA (INSTANCIA ÚNICA)
   # ==========================
-  chatbot-service-1:
+  chatbot-service:
     build:
       context: ./services/ai-service
       dockerfile: Dockerfile
-    container_name: chatbot_service_1
+    container_name: chatbot_service
     env_file:
       - .env
     environment:
@@ -666,51 +573,6 @@ services:
     # Puerto NO expuesto al host - solo accesible via nginx
     expose:
       - "8005"
-    depends_on:
-      chatbot-db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      ollama:
-        condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          cpus: "0.3"
-          memory: 256M
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8005/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    restart: unless-stopped
-    networks:
-      - backend_net
-      - database_net
-
-  chatbot-service-2:
-    build:
-      context: ./services/ai-service
-      dockerfile: Dockerfile
-    container_name: chatbot_service_2
-    env_file:
-      - .env
-    environment:
-      DATABASE_URL: "postgresql+psycopg://${CHATBOT_DB_USER:-admin}:${CHATBOT_DB_PASSWORD:-admin}@chatbot-db:5432/${CHATBOT_DB_NAME:-chatbot_db}"
-      OLLAMA_BASE_URL: "http://ollama:11434"
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama2}
-      OLLAMA_TIMEOUT: ${OLLAMA_TIMEOUT:-60}
-      REDIS_HOST: "redis"
-      REDIS_PORT: "6379"
-      REDIS_DB: "1"
-      AUTH_SERVICE_URL: "http://auth-service-1:8000"
-      RESERVATIONS_SERVICE_URL: "http://reservations-service-1:8002"
-      DOCUMENTS_SERVICE_URL: "http://documents-service:8003"
-      SECRET_KEY: "un-secreto-muy-fuerte-y-largo"
-      ALGORITHM: "HS256"
-      PORT: 8005
-    # no host port mapping for second replica
     depends_on:
       chatbot-db:
         condition: service_healthy
@@ -819,9 +681,7 @@ services:
         condition: service_healthy
       notifications-service:
         condition: service_healthy
-      chatbot-service-1:
-        condition: service_healthy
-      chatbot-service-2:
+      chatbot-service:
         condition: service_healthy
     networks:
       - frontend_net
@@ -889,7 +749,7 @@ services:
       # Montar datos de primarias en solo lectura (requerido por consigna)
       - auth_primary_data:/pgdata/auth-ro:ro
       - reservations_primary_data:/pgdata/res-ro:ro
-      - documents_primary_data:/pgdata/doc-ro:ro
+      - documents_data:/pgdata/doc-ro:ro
     depends_on:
       auth-db:
         condition: service_healthy
@@ -1098,20 +958,24 @@ services:
 # ==========================
 # Volúmenes persistentes
 # ==========================
-# ==========================
 volumes:
   minio_data:
   redis_data:
+  # Auth DB con réplica (HA)
   auth_primary_data:
   auth_replica_data:
+  # Reservations DB con réplica (HA)
   reservations_primary_data:
   reservations_replica_data:
-  documents_primary_data:
-  documents_replica_data:
-  chatbot_primary_data:
-  chatbot_replica_data:
-  ollama_models:  # Volumen para modelos de IA local (100% GRATUITO)
+  # Documents DB sin réplica (optimizado)
+  documents_data:
+  # ChatBot DB sin réplica (optimizado)
+  chatbot_data:
+  # Ollama - Modelos de IA local (100% GRATUITO)
+  ollama_models:
+  # Backups
   pg_backups:
+  # Monitoring
   prometheus_data:
   grafana_data:
 

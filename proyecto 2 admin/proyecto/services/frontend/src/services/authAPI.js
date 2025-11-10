@@ -155,6 +155,22 @@ class AuthAPI {
       throw error;
     }
   }
+
+  /**
+   * 🏛️ Consultar datos en bases municipales
+   * Simula consulta a sistemas de Licencias, Permisos, Patentes, JPL y Aseo
+   */
+  async consultarDatosMunicipales() {
+    try {
+      console.log('🏛️ Consultando bases de datos municipales...');
+      const response = await authClient.get('/consultar-datos-municipales');
+      console.log('✅ Datos municipales recibidos:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error consultando datos municipales:', error.response?.data || error.message);
+      throw error;
+    }
+  }
 }
 
 export default new AuthAPI();

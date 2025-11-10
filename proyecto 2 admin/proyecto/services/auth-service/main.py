@@ -550,6 +550,57 @@ async def confirm_password_reset(
     
     return {"message": "Contraseña restablecida exitosamente"}
 
+@app.get("/consultar-datos-municipales")
+async def consultar_datos_municipales(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    """
+    🏛️ Endpoint que simula consulta a bases de datos municipales
+    Retorna información de licencias, permisos, patentes, JPL y aseo del usuario actual.
+    """
+    try:
+        # El current_user ya es el objeto User completo
+        user = current_user
+        
+        if not user or not user.rut:
+            raise HTTPException(
+                status_code=400,
+                detail="Usuario no tiene RUT registrado para consultar bases municipales"
+            )
+        
+        # Simular delay de consulta a sistemas externos (1-2 segundos)
+        import asyncio
+        await asyncio.sleep(1.5)
+        
+        # Importar el simulador
+        from municipal_simulator import simular_consulta_municipal
+        
+        # Realizar la "consulta" a las bases municipales
+        datos_municipales = simular_consulta_municipal(user.rut)
+        
+        logger.info(f"✅ Consulta municipal realizada para RUT: {user.rut}")
+        
+        return {
+            "success": True,
+            "mensaje": "Consulta realizada exitosamente",
+            "usuario": {
+                "nombre": user.nombre,
+                "email": user.email,
+                "rut": user.rut
+            },
+            "datos_municipales": datos_municipales
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error en consulta municipal: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al consultar bases municipales: {str(e)}"
+        )
+
 @app.get("/health")
 def health_check():
     """Endpoint de salud para Docker."""
