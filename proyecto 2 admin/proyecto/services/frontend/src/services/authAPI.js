@@ -33,17 +33,21 @@ authClient.interceptors.response.use(
 class AuthAPI {
   async login(identifier, password, loginType = "email") {
     try {
+      console.log('🌐 authAPI.login() llamado con:', { identifier, loginType });
       const response = await authClient.post('/token', {
         identifier,
         password,
         login_type: loginType
       });
+      console.log('🌐 Respuesta del servidor:', response.data);
       if (response.data.access_token) {
+        console.log('💾 Guardando token en localStorage...');
         localStorage.setItem('authToken', response.data.access_token);
+        console.log('💾 Token guardado exitosamente');
       }
       return response.data;
     } catch (error) {
-      console.error('Error during login:', error.response?.data || error.message);
+      console.error('❌ Error during login:', error.response?.data || error.message);
       throw error;
     }
   }

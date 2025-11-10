@@ -195,6 +195,38 @@ services:
     networks:
       database_net:
 
+  # ==========================
+  # 🗄️ Base de datos de ChatBot IA
+  # ==========================
+  chatbot-db:
+    image: postgres:16.4
+    container_name: chatbot_db_primary
+    environment:
+      POSTGRES_USER: ${CHATBOT_DB_USER:-admin}
+      POSTGRES_PASSWORD: ${CHATBOT_DB_PASSWORD:-admin}
+      POSTGRES_DB: ${CHATBOT_DB_NAME:-chatbot_db}
+      REPLICATION_USER: replicator
+      REPLICATION_PASSWORD: replica_pass
+    ports:
+      - "${CHATBOT_DB_PORT:-5435}:5432"
+    volumes:
+      - chatbot_primary_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/chatbot-init:/docker-entrypoint-initdb.d
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${CHATBOT_DB_USER:-admin} -d ${CHATBOT_DB_NAME:-chatbot_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      database_net:
+
   documents-db-replica:
     image: postgres:16.4
     container_name: documents_db_replica
@@ -224,6 +256,44 @@ services:
         exec docker-entrypoint.sh postgres
     volumes:
       - documents_replica_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      database_net:
+
+  chatbot-db-replica:
+    image: postgres:16.4
+    container_name: chatbot_db_replica
+    depends_on:
+      chatbot-db:
+        condition: service_healthy
+    environment:
+      POSTGRES_USER: ${CHATBOT_DB_USER:-admin}
+      POSTGRES_PASSWORD: ${CHATBOT_DB_PASSWORD:-admin}
+      POSTGRES_DB: ${CHATBOT_DB_NAME:-chatbot_db}
+      PRIMARY_HOST: chatbot-db
+      PRIMARY_PORT: 5432
+      REPLICATION_USER: replicator
+      REPLICATION_PASSWORD: replica_pass
+    entrypoint:
+      - bash
+      - -c
+      - |
+        set -e
+        if [ ! -s "/var/lib/postgresql/data/PG_VERSION" ]; then
+          until pg_isready -h chatbot-db -p 5432; do sleep 2; done
+          rm -rf "/var/lib/postgresql/data"/*
+          PGPASSWORD='replica_pass' pg_basebackup -h chatbot-db -D "/var/lib/postgresql/data" -U replicator -Fp -Xs -P -R
+          chmod 700 "/var/lib/postgresql/data"
+        fi
+        exec docker-entrypoint.sh postgres
+    volumes:
+      - chatbot_replica_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h localhost -p 5432"]
       interval: 10s
@@ -556,6 +626,137 @@ services:
       backend_net:
 
   # ==========================
+  # 🤖 Servicio de ChatBot IA (Alta Disponibilidad)
+  # ==========================
+  chatbot-service-1:
+    build:
+      context: ./services/ai-service
+      dockerfile: Dockerfile
+    container_name: chatbot_service_1
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: "postgresql+psycopg://${CHATBOT_DB_USER:-admin}:${CHATBOT_DB_PASSWORD:-admin}@chatbot-db:5432/${CHATBOT_DB_NAME:-chatbot_db}"
+      OLLAMA_BASE_URL: "http://ollama:11434"
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama2}
+      OLLAMA_TIMEOUT: ${OLLAMA_TIMEOUT:-60}
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+      REDIS_DB: "1"
+      AUTH_SERVICE_URL: "http://auth-service-1:8000"
+      RESERVATIONS_SERVICE_URL: "http://reservations-service-1:8002"
+      DOCUMENTS_SERVICE_URL: "http://documents-service:8003"
+      SECRET_KEY: "un-secreto-muy-fuerte-y-largo"
+      ALGORITHM: "HS256"
+      PORT: 8005
+    ports:
+      - "${CHATBOT_SERVICE_PORT:-8005}:8005"
+    depends_on:
+      chatbot-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8005/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - backend_net
+      - database_net
+
+  chatbot-service-2:
+    build:
+      context: ./services/ai-service
+      dockerfile: Dockerfile
+    container_name: chatbot_service_2
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: "postgresql+psycopg://${CHATBOT_DB_USER:-admin}:${CHATBOT_DB_PASSWORD:-admin}@chatbot-db:5432/${CHATBOT_DB_NAME:-chatbot_db}"
+      OLLAMA_BASE_URL: "http://ollama:11434"
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama2}
+      OLLAMA_TIMEOUT: ${OLLAMA_TIMEOUT:-60}
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+      REDIS_DB: "1"
+      AUTH_SERVICE_URL: "http://auth-service-1:8000"
+      RESERVATIONS_SERVICE_URL: "http://reservations-service-1:8002"
+      DOCUMENTS_SERVICE_URL: "http://documents-service:8003"
+      SECRET_KEY: "un-secreto-muy-fuerte-y-largo"
+      ALGORITHM: "HS256"
+      PORT: 8005
+    # no host port mapping for second replica
+    depends_on:
+      chatbot-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8005/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - backend_net
+      - database_net
+
+  # ==========================
+  # 🧠 Ollama - LLM Local (100% GRATUITO)
+  # ==========================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama_service
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+    restart: unless-stopped
+    networks:
+      - backend_net
+    healthcheck:
+      test: ["CMD", "/bin/ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 600s
+    # Comando para descargar modelo al inicio (si no existe)
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        /bin/ollama serve &
+        OLLAMA_PID=$$!
+        echo "⏳ Esperando que Ollama inicie..."
+        sleep 10
+        echo "📥 Descargando modelo llama2 (esto puede tardar en el primer inicio)..."
+        /bin/ollama pull llama2 || echo "⚠️  Advertencia: No se pudo descargar el modelo automáticamente. Ejecuta: docker exec ollama_service ollama pull llama2"
+        echo "✅ Ollama listo con modelo llama2"
+        wait $$OLLAMA_PID
+
+  # ==========================
   # 💻 Frontend (Nginx)
   # ==========================
   frontend:
@@ -602,6 +803,10 @@ services:
       documents-service:
         condition: service_healthy
       notifications-service:
+        condition: service_healthy
+      chatbot-service-1:
+        condition: service_healthy
+      chatbot-service-2:
         condition: service_healthy
     networks:
       - frontend_net
@@ -810,6 +1015,21 @@ services:
       - monitoring_net
     restart: unless-stopped
 
+  postgres-exporter-chatbot:
+    image: prometheuscommunity/postgres-exporter:v0.11.1
+    container_name: postgres_exporter_chatbot
+    environment:
+      DATA_SOURCE_NAME: "postgresql://admin:admin@chatbot-db:5432/chatbot_db?sslmode=disable"
+      WEB_LISTEN_ADDRESS: ":9190"
+    ports:
+      - "9190:9187"
+    networks:
+      - backend_net
+      - prometheus_net
+      - database_net
+      - monitoring_net
+    restart: unless-stopped
+
 # ==========================
 # Volúmenes persistentes
 # ==========================
@@ -823,6 +1043,9 @@ volumes:
   reservations_replica_data:
   documents_primary_data:
   documents_replica_data:
+  chatbot_primary_data:
+  chatbot_replica_data:
+  ollama_models:  # Volumen para modelos de IA local (100% GRATUITO)
   pg_backups:
   prometheus_data:
   grafana_data:
