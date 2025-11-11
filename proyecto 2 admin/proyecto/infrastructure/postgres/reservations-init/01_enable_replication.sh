@@ -5,8 +5,9 @@ set -e
 # definida en docker-compose para database_net (172.28.0.0/16), usando scram-sha-256.
 
 PGDATA_DIR=${PGDATA:-/var/lib/postgresql/data}
-echo "[reservations-init] Habilitando replicación segura desde 172.28.0.0/16 (scram-sha-256)"
-echo "host replication replicator 172.28.0.0/16 scram-sha-256" >> "$PGDATA_DIR/pg_hba.conf"
+echo "[reservations-init] Habilitando replicación segura desde 172.28.0.0/16 (md5)"
+echo "host replication replicator 172.28.0.0/16 md5" >> "$PGDATA_DIR/pg_hba.conf"
+echo "host all ${RESERVATIONS_DB_USER} 0.0.0.0/0 md5" >> "$PGDATA_DIR/pg_hba.conf"
 
 # Escuchar en todas las interfaces del contenedor
 echo "listen_addresses = '*'" >> "$PGDATA_DIR/postgresql.conf"

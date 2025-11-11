@@ -43,7 +43,13 @@ class Reservation(SQLModel, table=True):
 # =============================================================================
 
 def create_db_and_tables():
-    SQLModel.metadata.create_all(engine)
+    try:
+        print("Intentando conectar a la base de datos y crear tablas...")
+        SQLModel.metadata.create_all(engine)
+        print("Tablas creadas exitosamente o ya existentes.")
+    except Exception as e:
+        print(f"Error al conectar o crear tablas: {e}")
+        raise
 
 def get_session():
     with Session(engine) as session:
@@ -64,7 +70,11 @@ def create_reservation(session: Session, reservation_data):
     return reservation
 
 def get_all_reservations(session: Session):
-    reservations = session.exec(select(Reservation).where(Reservation.estado != "cancelada")).all()
+    reservations = session.exec(
+        select(Reservation)
+    .where(Reservation.estado != "cancelada")
+    .where(Reservation.id is not None)
+    ).all()
     return reservations
 
 def get_reservations_by_user(session: Session, user_id: int):

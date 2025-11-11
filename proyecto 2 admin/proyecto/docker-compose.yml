@@ -634,6 +634,52 @@ services:
         wait $$OLLAMA_PID
 
   # ==========================
+  # 📂 Servicio de Datos Municipalidad (FastAPI)
+  # ==========================
+  datos-municipalidad-service:
+    build:
+      context: ./services/datos-municipalidad-service
+      dockerfile: dockerfile
+    container_name: datos_municipalidad_service
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: "postgresql+psycopg://${DOCUMENTS_DB_USER:-postgres}:${DOCUMENTS_DB_PASSWORD:-password}@documents-db:5432/${DOCUMENTS_DB_NAME:-documents}"
+      MINIO_ENDPOINT: "minio:9000"
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_SECURE: "false"
+      MINIO_BUCKET: "municipalidad-docs"
+      AUTH_SERVICE_URL: "http://auth-service-1:8000"
+      SECRET_KEY: "un-secreto-muy-fuerte-y-largo"
+      ALGORITHM: "HS256"
+      PORT: 8006
+    # Puerto NO expuesto al host - solo accesible via nginx
+    expose:
+      - "8006"
+    depends_on:
+      documents-db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8006/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - backend_net
+      - database_net
+      - storage_net
+
+  # ==========================
   # 💻 Frontend (Nginx)
   # ==========================
   frontend:
@@ -678,6 +724,8 @@ services:
       reservations-service-2:
         condition: service_healthy
       documents-service:
+        condition: service_healthy
+      datos-municipalidad-service:
         condition: service_healthy
       notifications-service:
         condition: service_healthy

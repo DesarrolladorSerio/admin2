@@ -37,8 +37,10 @@ class ReservationAPI {
     return response.data;
   }
 
-  async deleteReservation(id) {
-    const response = await apiClient.delete(`/reservations/${id}`);
+  async deleteReservation(id, reason) {
+    const response = await apiClient.delete(`/reservations/${id}`, {
+      data: { reason: reason }
+    });
     return response.data;
   }
 
