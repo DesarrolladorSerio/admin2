@@ -13,10 +13,12 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Copiar requirements e instalar dependencias
+# Copiar requirements e instalar dependencias con reintentos
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip \
-  && pip install --no-cache-dir -r requirements.txt \
+RUN pip install --no-cache-dir --upgrade pip --timeout 300 --retries 3 \
+  && (pip install --no-cache-dir -r requirements.txt --timeout 300 --retries 3 || \
+      (echo "Retrying pip install with different settings..." && \
+       pip install --no-cache-dir -r requirements.txt --timeout 600 --retries 5 --trusted-host pypi.org --trusted-host files.pythonhosted.org)) \
   && find /usr/local -type d -name '__pycache__' -exec rm -rf {} + \
   && find /usr/local -type f -name '*.pyc' -delete
 

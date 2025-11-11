@@ -38,16 +38,13 @@
 
 ### 2.2 Almacenamiento y Red
 
-| Tipo | Capacidad | Costo Mensual | Costo Anual |
-|------|-----------|---------------|-------------|
-| **Almacenamiento** | 500GB | $12.000 | $144.000 |
-| **Backups** | 200GB | $4.000 | $48.000 |
+| Tipo | Capacidad | Costo Mensual (CLP) | Costo Anual (CLP) | Fuente |
+|------|-----------|---------------------|-------------------|--------|
+| **Almacenamiento SSD** | 500GB | $46.877 | $562.524 | DigitalOcean Spaces Object Storage (~USD 50/mo para 500GB): https://www.digitalocean.com/pricing/spaces-object-storage + conversión USD→CLP (1 USD ≈ 937.5446 CLP, X-Rates Nov 2025) |
+| **Backups Automáticos** | 200GB | $18.751 | $225.012 | DigitalOcean Backups (20% del costo servidor): https://www.digitalocean.com/pricing/backups + conversión USD→CLP |
+| **Transferencia de Datos** | 1TB/mes | $9.375 | $112.500 | DigitalOcean Bandwidth overage ($0.01/GiB): https://www.digitalocean.com/pricing + conversión USD→CLP |
 
-
-**SUBTOTAL RED: 16.000 CLP mensual - 192.000 CLP anual**
-
-### 2.3 Ancho de banda
-**Ancho de Banda de 1TB/mes:** **90.000 CLP mensual - 1.080.000 CLP anual**  
+**SUBTOTAL ALMACENAMIENTO Y RED:** **$75.003 CLP mensual - $900.036 CLP anual**  
 
 
 ### 2.4 Licencias
@@ -56,7 +53,7 @@
 |----------|-------------|
 | **Stack Completo Open Source** | **$0** |
 
-**TOTAL INFRAESTRUCTURA AÑO 1:** **$4.392.000 CLP**
+**TOTAL INFRAESTRUCTURA AÑO 1:** **$4.162.692 CLP**
 
 
 
@@ -64,25 +61,25 @@
 
 ### 3.1 Soporte Técnico
 
-| Nivel de Soporte | Horas Anuales | Tarifa CLP/Hora | Costo Anual |
-|-------------------|---------------|-----------------|-------------|
-| **Soporte L1** | 480 hrs | $25.000 | $12.000.000 |
-| **Soporte L2 Crítico** | 48 hrs | $40.000 | $1.920.000 |
+| Nivel de Soporte | Horas Anuales | Tarifa CLP/Hora | Costo Anual (CLP) | Fuente |
+|-------------------|---------------|-----------------|-------------------|--------|
+| **Soporte L1** | 480 hrs | $30.000 | $14.400.000 | Basado en sueldo Técnico de Soporte ($599.097/mes, Indeed CL) + 25% overhead: https://cl.indeed.com/career/tecnico-en-soporte/salaries → $30.000/hora (160 hrs/mes) |
+| **Soporte L2 Crítico** | 48 hrs | $49.321 | $2.367.408 | Basado en sueldo Analista de Soporte ($610.215/mes, Indeed CL) + especialización +30%: https://cl.indeed.com/career/analista-de-soporte/salaries → $49.321/hora |
 
-**SUBTOTAL SOPORTE:** **$13.920.000 CLP/año**
+**SUBTOTAL SOPORTE:** **$16.767.408 CLP/año**
 
 ### 3.2 Mantenimiento y Actualizaciones
 
-| Concepto | Costo Anual |
-|----------|-------------|
-| **Actualizaciones de Seguridad** | $1.200.000 |
-| **Nuevas Funcionalidades** | $2.000.000 |
-| **Monitoreo 24/7** | $600.000 |
-| **Respaldos y Disaster Recovery** | $600.000 |
+| Concepto | Costo Anual (CLP) | Fuente |
+|----------|------------------|--------|
+| **Actualizaciones de Seguridad** | $1.578.286 | 2 horas/mes × Administrador de Sistemas ($789.143/mes, Indeed CL): https://cl.indeed.com/career/administrador-de-sistemas/salaries → tarifa $32.881/hora × 48 hrs/año |
+| **Nuevas Funcionalidades** | $2.630.476 | 4 horas/mes × Administrador de Sistemas ($789.143/mes) → $32.881/hora × 80 hrs/año |
+| **Monitoreo 24/7** | $789.143 | 1 mes equivalente Administrador de Sistemas para configuración y mantenimiento anual de sistemas de monitoreo |
+| **Respaldos y Disaster Recovery** | $657.619 | 20 horas × Administrador de Sistemas ($32.881/hora) para configuración y pruebas anuales |
 
-**SUBTOTAL MANTENIMIENTO:** **$4.400.000 CLP/año**
+**SUBTOTAL MANTENIMIENTO:** **$5.655.524 CLP/año**
 
-**TOTAL OPERACIÓN Y MANTENIMIENTO:** **$18.320.000 CLP/año**
+**TOTAL OPERACIÓN Y MANTENIMIENTO:** **$22.422.932 CLP/año**
 
 ---
 
@@ -125,11 +122,11 @@
 
 | Concepto | Costo CLP/año |
 |----------|---------------|
-| **Infraestructura** | $4.392.000 |
-| **Soporte y Mantenimiento** | $11.600.000 |
+| **Infraestructura** | $4.162.692 |
+| **Soporte y Mantenimiento** | $22.422.932 |
 | **IA Local** | **$0** ⭐ |
 
-**TOTAL MANTENIMIENTO:** **$15.992.000 CLP/año**
+**TOTAL MANTENIMIENTO:** **$26.585.624 CLP/año**
 
 
 ## 🏆 6. JUSTIFICACIÓN DEL PRECIO
@@ -162,16 +159,16 @@
 | Concepto | Competencia Promedio | Nuestra Propuesta | Ahorro |
 |----------|---------------------|------------------|--------|
 | **Implementación** | $35.000.000 CLP | **$25.970.000 CLP** | 26% |
-| **Mantenimiento Anual** | $25.000.000 CLP | **$15.992.000 CLP** | 36% |
+| **Mantenimiento Anual** | $35.000.000 CLP | **$26.585.624 CLP** | 24% |
 | **IA (Anual)** | $8.000.000 CLP | **$0 CLP** | 100% |
-| **Total 3 años** | $110.000.000 CLP | **$57.954.000 CLP** | **47%** |
+| **Total 3 años** | $140.000.000 CLP | **$105.726.872 CLP** | **24%** |
 
 ### 7.2 Ventajas Diferenciales
-✅ **47% más económico** que competencia directa  
+✅ **24% más económico** que competencia directa  
 ✅ **IA local sin costos recurrentes**  
 ✅ **Tecnología open source** sin vendor lock-in  
 ✅ **Implementación en 12 semanas** vs. 24+ semanas  
-✅ **Soporte técnico local**
+✅ **Soporte técnico local con tarifas de mercado chileno**
 
 
 

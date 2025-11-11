@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost';
+// Usar rutas relativas que se resuelven a través del proxy nginx
+const API_BASE = '/api/documents';
 
 /**
  * Servicio API para el módulo de Digitalizador
@@ -38,11 +39,19 @@ export const subirDocumentoCiudadano = async (file, reservaId, tipoDocumento) =>
     try {
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('reserva_id', reservaId);
-        formData.append('tipo_documento', tipoDocumento);
+        
+        // Solo agregar reserva_id si tiene un valor válido
+        if (reservaId && reservaId !== '' && !isNaN(reservaId)) {
+            formData.append('reserva_id', parseInt(reservaId));
+        }
+        
+        // Solo agregar tipo_documento si tiene un valor válido
+        if (tipoDocumento && tipoDocumento.trim() !== '') {
+            formData.append('tipo_documento', tipoDocumento.trim());
+        }
 
         const response = await axios.post(
-            `${API_URL}/api/documents/upload-documento`,
+            `${API_BASE}/upload-documento`,
             formData,
             {
                 headers: {
@@ -85,7 +94,7 @@ export const subirDocumentoAntiguo = async (file, datosDocumento) => {
         }
 
         const response = await axios.post(
-            `${API_URL}/api/documents/documentos-antiguos`,
+            `${API_BASE}/documentos-antiguos`,
             formData,
             {
                 headers: {
@@ -107,7 +116,7 @@ export const subirDocumentoAntiguo = async (file, datosDocumento) => {
 export const completarDigitalizacion = async (docId, calidad, notas = '') => {
     try {
         const response = await axios.put(
-            `${API_URL}/api/documents/documentos-antiguos/${docId}/completar`,
+            `${API_BASE}/documentos-antiguos/${docId}/completar`,
             null,
             {
                 ...getAuthHeadersJSON(),
@@ -131,7 +140,7 @@ export const completarDigitalizacion = async (docId, calidad, notas = '') => {
 export const buscarDocumentosAntiguos = async (filtros) => {
     try {
         const response = await axios.post(
-            `${API_URL}/api/documents/documentos-antiguos/buscar`,
+            `${API_BASE}/documentos-antiguos/buscar`,
             filtros,
             getAuthHeadersJSON()
         );
@@ -148,7 +157,7 @@ export const buscarDocumentosAntiguos = async (filtros) => {
 export const getDocumentosPendientes = async (limit = 50) => {
     try {
         const response = await axios.get(
-            `${API_URL}/api/documents/documentos-antiguos/pendientes`,
+            `${API_BASE}/documentos-antiguos/pendientes`,
             {
                 ...getAuthHeaders(),
                 params: { limit }
@@ -167,7 +176,7 @@ export const getDocumentosPendientes = async (limit = 50) => {
 export const getDocumentosReserva = async (reservaId) => {
     try {
         const response = await axios.get(
-            `${API_URL}/api/documents/documentos/reserva/${reservaId}`,
+            `${API_BASE}/documentos/reserva/${reservaId}`,
             getAuthHeaders()
         );
         return response.data;
@@ -183,7 +192,7 @@ export const getDocumentosReserva = async (reservaId) => {
 export const getDocumentosUsuario = async (usuarioId) => {
     try {
         const response = await axios.get(
-            `${API_URL}/api/documents/documentos/usuario/${usuarioId}`,
+            `${API_BASE}/documentos/usuario/${usuarioId}`,
             getAuthHeaders()
         );
         return response.data;
@@ -199,7 +208,7 @@ export const getDocumentosUsuario = async (usuarioId) => {
 export const revisarDocumento = async (documentoId, estado, notas = '') => {
     try {
         const response = await axios.put(
-            `${API_URL}/api/documents/documentos/${documentoId}/revisar`,
+            `${API_BASE}/documentos/${documentoId}/revisar`,
             {
                 estado, // aprobado, rechazado
                 notas
@@ -223,7 +232,7 @@ export const revisarDocumento = async (documentoId, estado, notas = '') => {
 export const registrarJornada = async (datosJornada) => {
     try {
         const response = await axios.post(
-            `${API_URL}/api/documents/registro-digitalizacion`,
+            `${API_BASE}/registro-digitalizacion`,
             datosJornada,
             getAuthHeadersJSON()
         );
@@ -240,7 +249,7 @@ export const registrarJornada = async (datosJornada) => {
 export const getReporteDiario = async (fecha) => {
     try {
         const response = await axios.get(
-            `${API_URL}/api/documents/reportes/digitalizacion/diario`,
+            `${API_BASE}/reportes/digitalizacion/diario`,
             {
                 ...getAuthHeaders(),
                 params: { fecha }
@@ -259,7 +268,7 @@ export const getReporteDiario = async (fecha) => {
 export const getReporteSemanal = async (fechaInicio) => {
     try {
         const response = await axios.get(
-            `${API_URL}/api/documents/reportes/digitalizacion/semanal`,
+            `${API_BASE}/reportes/digitalizacion/semanal`,
             {
                 ...getAuthHeaders(),
                 params: { fecha_inicio: fechaInicio }
@@ -278,7 +287,7 @@ export const getReporteSemanal = async (fechaInicio) => {
 export const getReporteMensual = async (año, mes) => {
     try {
         const response = await axios.get(
-            `${API_URL}/api/documents/reportes/digitalizacion/mensual`,
+            `${API_BASE}/reportes/digitalizacion/mensual`,
             {
                 ...getAuthHeaders(),
                 params: { año, mes }
@@ -297,7 +306,7 @@ export const getReporteMensual = async (año, mes) => {
 export const getAvanceDigitalizacion = async () => {
     try {
         const response = await axios.get(
-            `${API_URL}/api/documents/reportes/avance-antiguos`,
+            `${API_BASE}/reportes/avance-antiguos`,
             getAuthHeaders()
         );
         return response.data;

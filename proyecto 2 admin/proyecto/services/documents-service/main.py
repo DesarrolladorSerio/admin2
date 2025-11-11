@@ -23,9 +23,10 @@ from db_documents import (
     update_documento_antiguo,
     update_documento_estado,
 )
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 from sqlmodel import Session
+from typing import Optional
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -47,10 +48,10 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 # =============================================================================
 
 class DocumentoCiudadanoCreate(BaseModel):
-    reserva_id: int
+    reserva_id: Optional[int] = None
     usuario_id: int
     usuario_rut: str
-    tipo_documento: str
+    tipo_documento: Optional[str] = None
     nombre_archivo: str
     ruta_archivo: str
     tamano_bytes: int
@@ -111,8 +112,8 @@ def on_startup():
 @app.post("/upload-documento", status_code=status.HTTP_201_CREATED)
 async def upload_documento(
     file: UploadFile = File(...),
-    reserva_id: int = None,
-    tipo_documento: str = None,
+    reserva_id: int = Form(None),
+    tipo_documento: str = Form(None),
     current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):

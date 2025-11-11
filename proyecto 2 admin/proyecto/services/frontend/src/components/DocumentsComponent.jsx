@@ -44,7 +44,7 @@ const DocumentsComponent = () => {
             alert('Por favor selecciona un archivo');
             return;
         }
-        if (!tipoDocumento) {
+        if (!tipoDocumento || tipoDocumento.trim() === '') {
             alert('Por favor especifica un tipo de documento');
             return;
         }
@@ -53,7 +53,7 @@ const DocumentsComponent = () => {
             setUploading(true);
             await digitalizadorAPI.subirDocumentoCiudadano(
                 selectedFile,
-                reservaId || null, // Enviar null si está vacío
+                reservaId, // Enviar el valor tal como está
                 tipoDocumento
             );
 

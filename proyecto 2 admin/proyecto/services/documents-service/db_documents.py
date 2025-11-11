@@ -18,10 +18,10 @@ class DocumentoCiudadano(SQLModel, table=True):
     __tablename__ = "documentos_ciudadano"
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    reserva_id: int  # ID de la reserva asociada
+    reserva_id: Optional[int] = None  # ID de la reserva asociada (opcional)
     usuario_id: int  # ID del usuario
     usuario_rut: str
-    tipo_documento: str  # cedula, certificado_medico, foto, antecedentes, etc.
+    tipo_documento: Optional[str] = None  # cedula, certificado_medico, foto, antecedentes, etc.
     nombre_archivo: str
     ruta_archivo: str  # Ruta en almacenamiento
     tamano_bytes: int

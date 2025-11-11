@@ -85,7 +85,7 @@ class MunicipalDatabaseSimulator:
         """
         Simula consulta a base de datos de Permisos de Edificación
         """
-        tiene_permisos = random.choice([True, False, False, False])  # 25% tiene permisos
+        tiene_permisos = random.choice([True, True, False])  # 67% tiene permisos
         
         if not tiene_permisos:
             return []
@@ -126,7 +126,7 @@ class MunicipalDatabaseSimulator:
         """
         Simula consulta a base de datos de Patentes Comerciales
         """
-        tiene_patentes = random.choice([True, False, False])  # 33% tiene patentes
+        tiene_patentes = random.choice([True, True, False])  # 67% tiene patentes
         
         if not tiene_patentes:
             return []
@@ -177,7 +177,7 @@ class MunicipalDatabaseSimulator:
         """
         Simula consulta a Juzgado de Policía Local (JPL)
         """
-        tiene_multas = random.choice([True, False, False, False])  # 25% tiene multas
+        tiene_multas = random.choice([True, True, False])  # 67% tiene multas
         
         if not tiene_multas:
             return []

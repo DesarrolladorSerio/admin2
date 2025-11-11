@@ -10,9 +10,13 @@ WORKDIR /app
 # Crear usuario no root
 RUN adduser -D appuser
 
-# Copiar e instalar dependencias
+# Copiar e instalar dependencias con reintentos
 COPY package.json package-lock.json* ./
-RUN npm install
+RUN npm config set registry https://registry.npmjs.org/ \
+    && npm config set fetch-timeout 300000 \
+    && (npm install --no-audit --no-fund || \
+        (echo "Retrying npm install..." && sleep 10 && npm install --no-audit --no-fund --verbose) || \
+        (echo "Using yarn as fallback..." && npm install -g yarn && yarn install))
 
 # Copiar el resto del código y construir
 COPY . .
@@ -25,8 +29,14 @@ LABEL maintainer="Augusto Fuenzalida" \
       version="1.0" \
       description="Frontend compilado servido con Nginx"
 
-# Instalar wget para healthcheck
-RUN apk add --no-cache wget
+# Configurar DNS y instalar herramientas para healthcheck
+RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf && \
+    echo "nameserver 1.1.1.1" >> /etc/resolv.conf && \
+    apk update && \
+    apk add --no-cache wget curl || \
+    (echo "Retrying with different mirror..." && \
+     sed -i 's/dl-cdn.alpinelinux.org/alpine.global.ssl.fastly.net/g' /etc/apk/repositories && \
+     apk update && apk add --no-cache wget curl)
 
 # Crear y dar permisos a directorios usados por Nginx
 RUN mkdir -p /var/cache/nginx /var/run /var/log/nginx && \

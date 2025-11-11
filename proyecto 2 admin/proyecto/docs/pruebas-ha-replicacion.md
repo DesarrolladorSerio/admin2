@@ -13,10 +13,9 @@ Todas las instrucciones están pensadas para Windows PowerShell.
   ```powershell
   docker compose ps
   ```
-- Obtén el puerto expuesto del gateway (Nginx):
+- El gateway está expuesto en el puerto 8081:
   ```powershell
-  $GW = (docker compose port gateway 80).Split(':')[-1]
-  Write-Host "Gateway en http://localhost:$GW"
+  Write-Host "Gateway en http://localhost:8081"
   ```
 
 ---
@@ -26,14 +25,14 @@ Ejemplo con el servicio de Autenticación (2 réplicas: `auth-service-1` y `auth
 
 1. Comprobar salud por el gateway (repite 2–3 veces):
    ```powershell
-   curl.exe "http://localhost:$GW/api/auth/health"
+   curl.exe "http://localhost:8081/api/auth/health"
    # Esperado: 200 OK (texto: OK u otro contenido breve)
    ```
 
-2. “Matar” una réplica del servicio y comprobar continuidad:
+2. "Matar" una réplica del servicio y comprobar continuidad:
    ```powershell
    docker compose stop auth-service-1
-   curl.exe "http://localhost:$GW/api/auth/health"   # Debe seguir 200 (atiende auth-service-2)
+   curl.exe "http://localhost:8081/api/auth/health"   # Debe seguir 200 (atiende auth-service-2)
    ```
 
 3. Recuperar la réplica caída:
@@ -43,9 +42,9 @@ Ejemplo con el servicio de Autenticación (2 réplicas: `auth-service-1` y `auth
 
 4. Repetir con el clúster de Reservas:
    ```powershell
-   curl.exe "http://localhost:$GW/api/reservations/health"  # 200
+   curl.exe "http://localhost:8081/api/reservations/health"  # 200
    docker compose stop reservations-service-1
-   curl.exe "http://localhost:$GW/api/reservations/health"  # sigue 200 (atiende reservations-service-2)
+   curl.exe "http://localhost:8081/api/reservations/health"  # sigue 200 (atiende reservations-service-2)
    docker compose start reservations-service-1
    ```
 
@@ -126,6 +125,21 @@ Para agilizar la demostración y ver estados / alertas sin navegar manualmente:
 - Postgres Reservas: http://localhost:9188/metrics
 - Postgres Documentos: http://localhost:9189/metrics
 - Postgres Chatbot: http://localhost:9190/metrics
+
+### Servicios de infraestructura
+- MinIO Console: http://localhost:9001/ (usuario: `${MINIO_ACCESS_KEY}`, contraseña: `${MINIO_SECRET_KEY}`)
+- MinIO API: http://localhost:9000/
+- Ollama (IA local): http://localhost:11434/
+
+### Bases de datos (puertos expuestos)
+- Auth DB (Primary): localhost:5432
+- Reservations DB (Primary): localhost:5433
+- Documents DB: localhost:5434
+- Chatbot DB: localhost:5436
+
+### Frontend y Gateway
+- Frontend (React): http://localhost:3000/
+- API Gateway (Nginx): http://localhost:8081/
 
 Notas:
 - cAdvisor está omitido en Windows (limitaciones cgroup); para métricas de contenedores usar Linux/WSL2 si se requiere.

@@ -587,10 +587,10 @@ services:
           memory: 256M
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8005/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
     networks:
       - backend_net
@@ -735,8 +735,8 @@ services:
       - frontend_net
       - backend_net
     healthcheck:
-      # Use wget inside the nginx-based image (curl may not be present)
-      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      # Try wget first, fallback to curl if wget is not available
+      test: ["CMD-SHELL", "wget -qO- http://localhost/health || curl -f http://localhost/health"]
       interval: 30s
       timeout: 10s
       retries: 5
