@@ -34,10 +34,10 @@ export default function Menu() {
         navigate('/login');
     };
 
-    if (!authAPI.isAuthenticated() || loading) {
+    if (loading) {
         return (
-            <div style={{ padding: '20px', textAlign: 'center' }}>
-                {loading ? '🔄 Cargando...' : null}
+            <div className="flex justify-center items-center h-screen bg-gray-100">
+                <div className="text-xl font-semibold text-gray-700">🔄 Cargando...</div>
             </div>
         );
     }
@@ -45,33 +45,25 @@ export default function Menu() {
     const displayName = currentUser?.nombre || currentUser?.username || 'Usuario';
 
     return (
-        <div style={{ padding: '20px', maxWidth: '600px', margin: '50px auto', textAlign: 'center' }}>
-            <h1>👋 Bienvenido, {displayName}</h1>
-            <div style={{
-                marginBottom: '30px',
-                padding: '15px',
-                backgroundColor: '#f8f9fa',
-                borderRadius: '8px',
-                border: '1px solid #e9ecef'
-            }}>
-                <p><strong>📧 Email:</strong> {currentUser?.email}</p>
-                {currentUser?.rut && <p><strong>🆔 RUT:</strong> {currentUser.rut}</p>}
+        <div className="min-h-screen bg-gray-100 flex flex-col items-center p-4">
+            <div className="w-full max-w-2xl bg-white shadow-lg rounded-lg p-8 mt-10">
+                <h1 className="text-3xl font-bold text-center text-gray-800 mb-4">👋 ¡Bienvenido, {displayName}!</h1>
+                <div className="mb-8 p-4 bg-gray-50 rounded-lg border border-gray-200 text-gray-700">
+                    <p><strong className="font-semibold">📧 Email:</strong> {currentUser?.email}</p>
+                    {currentUser?.rut && <p><strong className="font-semibold">🆔 RUT:</strong> {currentUser.rut}</p>}
+                </div>
+                <MenuOptions
+                    userRole={currentUser?.role}
+                    onNavigate={navigate}
+                    onLogout={handleLogout}
+                />
             </div>
-            {/* Principio de Responsabilidad Única: Separamos las opciones por tipo de usuario */}
-            <MenuOptions
-                userRole={currentUser?.role}
-                onNavigate={navigate}
-                onLogout={handleLogout}
-            />
         </div>
     );
 }
 
-// Principio de Responsabilidad Única: Componente especializado en mostrar opciones de menú
 function MenuOptions({ userRole, onNavigate, onLogout }) {
-    // Principio de Composición: Crear un botón reutilizable
-    const MenuButton = ({ onClick, background, children, isAdmin = false }) => {
-        // Principio de Principio Abierto/Cerrado: Solo mostrar botones de admin si el usuario es admin
+    const MenuButton = ({ onClick, className, children, isAdmin = false }) => {
         if (isAdmin && userRole !== 'admin') {
             return null;
         }
@@ -79,18 +71,7 @@ function MenuOptions({ userRole, onNavigate, onLogout }) {
         return (
             <button
                 onClick={onClick}
-                style={{
-                    padding: '12px 20px',
-                    background,
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: 6,
-                    marginRight: '10px',
-                    marginBottom: '10px',
-                    fontSize: '16px',
-                    cursor: 'pointer',
-                    display: 'inline-block'
-                }}
+                className={`w-full text-left px-4 py-3 mb-3 text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-opacity-50 ${className}`}
             >
                 {children}
             </button>
@@ -98,98 +79,80 @@ function MenuOptions({ userRole, onNavigate, onLogout }) {
     };
 
     return (
-        <div style={{ marginTop: '20px' }}>
-            {/* Opciones disponibles para todos los usuarios */}
-            <MenuButton
-                onClick={() => onNavigate('/reservas')}
-                background="#007bff"
-            >
-                📅 Ir a Reservas
-            </MenuButton>
-
-            {/* 🏛️ NUEVO: Consulta de Datos Municipales */}
-            <MenuButton
-                onClick={() => onNavigate('/datos-municipales')}
-                background="#3498db"
-            >
-                🏛️ Mis Datos Municipales
-            </MenuButton>
-
-            {/* Gestión avanzada de reservas para admin/empleados */}
-            {(userRole === 'admin' || userRole === 'employee') && (
+        <div className="mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Opciones de Usuario */}
                 <MenuButton
-                    onClick={() => onNavigate('/admin/reservas')}
-                    background="#17a2b8"
+                    onClick={() => onNavigate('/reservas')}
+                    className="bg-blue-500 hover:bg-blue-600 focus:ring-blue-400"
                 >
-                    🔧 Gestionar Todas las Reservas
+                    📅 Mis Reservas
                 </MenuButton>
-            )}
+                <MenuButton
+                    onClick={() => onNavigate('/documentos')}
+                    className="bg-green-500 hover:bg-green-600 focus:ring-green-400"
+                >
+                    📄 Mis Documentos
+                </MenuButton>
+                <MenuButton
+                    onClick={() => onNavigate('/datos-municipales')}
+                    className="bg-indigo-500 hover:bg-indigo-600 focus:ring-indigo-400"
+                >
+                    🏛️ Mis Datos Municipales
+                </MenuButton>
 
-            <MenuButton
-                onClick={() => onNavigate('/documentos')}
-                background="#28a745"
-            >
-                📄 Documentos
-            </MenuButton>
+                {/* Opciones de Admin/Empleado */}
+                {(userRole === 'admin' || userRole === 'employee') && (
+                    <MenuButton
+                        onClick={() => onNavigate('/admin/reservas')}
+                        className="bg-teal-500 hover:bg-teal-600 focus:ring-teal-400"
+                    >
+                        🔧 Gestionar Todas las Reservas
+                    </MenuButton>
+                )}
 
-            {/* Principio de Segregación de Interfaces: Opciones específicas para administradores */}
-            <MenuButton
-                onClick={() => onNavigate('/admin/register-employee')}
-                background="#6f42c1"
-                isAdmin={true}
-            >
-                👥 Registrar Empleado
-            </MenuButton>
+                {/* Opciones solo para Admin */}
+                <MenuButton
+                    onClick={() => onNavigate('/admin/reports')}
+                    className="bg-orange-500 hover:bg-orange-600 focus:ring-orange-400"
+                    isAdmin={true}
+                >
+                    📊 Reportes y Estadísticas
+                </MenuButton>
+                <MenuButton
+                    onClick={() => onNavigate('/admin/users')}
+                    className="bg-purple-500 hover:bg-purple-600 focus:ring-purple-400"
+                    isAdmin={true}
+                >
+                    👤 Gestionar Usuarios
+                </MenuButton>
+                {/* El botón "Registrar Empleado" se ha ocultado según la solicitud del usuario */}
+                {/* <MenuButton
+                    onClick={() => onNavigate('/admin/register-employee')}
+                    className="bg-gray-600 hover:bg-gray-700 focus:ring-gray-500"
+                    isAdmin={true}
+                >
+                    👥 Registrar Empleado
+                </MenuButton> */}
+            </div>
 
-            <MenuButton
-                onClick={() => onNavigate('/admin/reports')}
-                background="#fd7e14"
-                isAdmin={true}
-            >
-                📊 Reportes
-            </MenuButton>
+            {/* Logout y Avisos */}
+            <div className="mt-8 border-t pt-6">
+                <MenuButton
+                    onClick={onLogout}
+                    className="bg-red-500 hover:bg-red-600 focus:ring-red-400"
+                >
+                    🚪 Cerrar Sesión
+                </MenuButton>
 
-            <MenuButton
-                onClick={() => onNavigate('/admin/users')}
-                background="#20c997"
-                isAdmin={true}
-            >
-                👤 Gestionar Usuarios
-            </MenuButton>
-
-            {/* Opción de cerrar sesión (disponible para todos) */}
-            <MenuButton
-                onClick={onLogout}
-                background="#dc3545"
-            >
-                🚪 Cerrar Sesión
-            </MenuButton>
-
-            {/* Indicador visual del rol del usuario */}
-            {userRole === 'admin' && (
-                <div style={{
-                    marginTop: '20px',
-                    padding: '10px',
-                    background: '#e7f3ff',
-                    border: '1px solid #b3d7ff',
-                    borderRadius: '4px',
-                    fontSize: '14px'
-                }}>
-                    🔐 <strong>Panel de Administración Activo</strong>
+                {userRole === 'admin' && (
+                    <div className="mt-4 p-3 bg-blue-100 border border-blue-300 text-blue-800 rounded-lg text-sm text-center">
+                        🔐 <strong>Panel de Administración Activo</strong>
+                    </div>
+                )}
+                <div className="mt-4 p-3 bg-purple-100 border border-purple-300 text-purple-800 rounded-lg text-sm text-center">
+                    🤖 <strong>Asistente IA disponible</strong> en la esquina inferior derecha.
                 </div>
-            )}
-
-            {/* Información sobre el asistente IA */}
-            <div style={{
-                marginTop: '20px',
-                padding: '10px',
-                background: '#f3e5ff',
-                border: '1px solid #d1b3ff',
-                borderRadius: '4px',
-                fontSize: '14px'
-            }}>
-                🤖 <strong>Asistente IA disponible</strong><br />
-                Busca el botón flotante en la esquina inferior derecha
             </div>
         </div>
     );

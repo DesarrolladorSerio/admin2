@@ -9,7 +9,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost';
 
 // Configuración de axios con token
 const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('authToken');
     return {
         headers: {
             Authorization: `Bearer ${token}`
@@ -18,7 +18,7 @@ const getAuthHeaders = () => {
 };
 
 const getAuthHeadersJSON = () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('authToken');
     return {
         headers: {
             Authorization: `Bearer ${token}`,
@@ -178,6 +178,22 @@ export const getDocumentosReserva = async (reservaId) => {
 };
 
 /**
+ * Obtener todos los documentos de un usuario
+ */
+export const getDocumentosUsuario = async (usuarioId) => {
+    try {
+        const response = await axios.get(
+            `${API_URL}/api/documents/documentos/usuario/${usuarioId}`,
+            getAuthHeaders()
+        );
+        return response.data;
+    } catch (error) {
+        console.error('Error al obtener los documentos del usuario:', error);
+        throw error;
+    }
+};
+
+/**
  * Revisar documento ciudadano
  */
 export const revisarDocumento = async (documentoId, estado, notas = '') => {
@@ -325,6 +341,7 @@ export default {
     buscarDocumentosAntiguos,
     getDocumentosPendientes,
     getDocumentosReserva,
+    getDocumentosUsuario,
     revisarDocumento,
     registrarJornada,
     getReporteDiario,

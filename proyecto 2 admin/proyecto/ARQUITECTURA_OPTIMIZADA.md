@@ -79,7 +79,13 @@ app = FastAPI(
 # NOTA: CORS removido - Nginx API Gateway maneja los headers CORS
 ```
 
-#### c) Documents Service (`services/documents-services/main.py`)
+#### c) Documents Service (`services/documents-service/main.py`)
+- **Gestión de documentos y digitalización**: Documentos ciudadanos y documentos antiguos
+- **Propósito**: Administración de documentos del sistema
+
+#### d) Datos Municipalidad Service (`services/datos-municipalidad-service/main.py`)
+- **Gestión de datos municipales**: Documentos de la municipalidad
+- **Propósito**: Almacenamiento de datos de licitaciones, documentos oficiales, etc.
 ```python
 # DESPUÉS:
 app = FastAPI(

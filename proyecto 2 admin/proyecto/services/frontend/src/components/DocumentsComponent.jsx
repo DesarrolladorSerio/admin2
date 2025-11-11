@@ -1,55 +1,40 @@
 import React, { useState, useEffect } from 'react';
-import documentsAPI from '../services/documentsAPI';
+import authAPI from '../services/authAPI';
+import digitalizadorAPI from '../services/digitalizadorAPI';
 
 const DocumentsComponent = () => {
     const [documents, setDocuments] = useState([]);
-    const [documentTypes, setDocumentTypes] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [currentUser, setCurrentUser] = useState(null);
+    const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [selectedFile, setSelectedFile] = useState(null);
-    const [uploadForm, setUploadForm] = useState({
-        title: '',
-        description: '',
-        documentType: '',
-        tags: ''
-    });
+    const [tipoDocumento, setTipoDocumento] = useState('');
+    const [reservaId, setReservaId] = useState('');
+
 
     useEffect(() => {
-        loadDocuments();
-        loadDocumentTypes();
+        const loadInitialData = async () => {
+            try {
+                setLoading(true);
+                const user = await authAPI.getCurrentUser();
+                setCurrentUser(user);
+                if (user && user.id) {
+                    const userDocs = await digitalizadorAPI.getDocumentosUsuario(user.id);
+                    setDocuments(userDocs.documentos || []);
+                }
+            } catch (error) {
+                console.error('Error loading initial data:', error);
+                alert('Error cargando sus datos. Por favor, intente recargar la página.');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadInitialData();
     }, []);
-
-    const loadDocuments = async () => {
-        try {
-            setLoading(true);
-            const data = await documentsAPI.getDocuments();
-            setDocuments(data.documents || []);
-        } catch (error) {
-            console.error('Error loading documents:', error);
-            alert('Error cargando documentos');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const loadDocumentTypes = async () => {
-        try {
-            const data = await documentsAPI.getDocumentTypes();
-            setDocumentTypes(data.document_types || []);
-        } catch (error) {
-            console.error('Error loading document types:', error);
-        }
-    };
 
     const handleFileChange = (e) => {
         setSelectedFile(e.target.files[0]);
-    };
-
-    const handleInputChange = (e) => {
-        setUploadForm({
-            ...uploadForm,
-            [e.target.name]: e.target.value
-        });
     };
 
     const handleUpload = async (e) => {
@@ -59,46 +44,31 @@ const DocumentsComponent = () => {
             alert('Por favor selecciona un archivo');
             return;
         }
-
-        if (!uploadForm.documentType) {
-            alert('Por favor selecciona un tipo de documento');
+        if (!tipoDocumento) {
+            alert('Por favor especifica un tipo de documento');
             return;
         }
 
         try {
             setUploading(true);
-
-            const tags = uploadForm.tags ? uploadForm.tags.split(',').map(tag => tag.trim()) : [];
-
-            // Encontrar el tipo de documento seleccionado
-            const selectedType = documentTypes.find(type => type.id === parseInt(uploadForm.documentType));
-            if (!selectedType) {
-                alert('Tipo de documento no válido');
-                return;
-            }
-
-            await documentsAPI.uploadDocument(
+            await digitalizadorAPI.subirDocumentoCiudadano(
                 selectedFile,
-                uploadForm.title || selectedFile.name,
-                uploadForm.description,
-                selectedType.type_name,  // Enviar el nombre del tipo, no el ID
-                tags
+                reservaId || null, // Enviar null si está vacío
+                tipoDocumento
             );
 
             alert('Documento subido exitosamente');
 
-            // Limpiar formulario
+            // Limpiar formulario y recargar
             setSelectedFile(null);
-            setUploadForm({
-                title: '',
-                description: '',
-                documentType: '',
-                tags: ''
-            });
+            setTipoDocumento('');
+            setReservaId('');
             document.getElementById('fileInput').value = '';
-
-            // Recargar documentos
-            loadDocuments();
+            
+            if (currentUser && currentUser.id) {
+                const userDocs = await digitalizadorAPI.getDocumentosUsuario(currentUser.id);
+                setDocuments(userDocs.documentos || []);
+            }
 
         } catch (error) {
             console.error('Error uploading document:', error);
@@ -108,37 +78,13 @@ const DocumentsComponent = () => {
         }
     };
 
-    const handleDownload = async (documentId) => {
-        try {
-            await documentsAPI.downloadDocument(documentId);
-        } catch (error) {
-            console.error('Error downloading document:', error);
-            alert('Error descargando documento');
-        }
-    };
-
-    const handleDelete = async (documentId) => {
-        if (!confirm('¿Estás seguro de que quieres eliminar este documento?')) {
-            return;
-        }
-
-        try {
-            await documentsAPI.deleteDocument(documentId);
-            alert('Documento eliminado exitosamente');
-            loadDocuments();
-        } catch (error) {
-            console.error('Error deleting document:', error);
-            alert('Error eliminando documento');
-        }
-    };
-
     return (
-        <div className="p-6 max-w-6xl mx-auto">
-            <h1 className="text-3xl font-bold mb-6">Gestión de Documentos</h1>
+        <div className="p-6 max-w-6xl mx-auto bg-gray-50 min-h-screen">
+            <h1 className="text-3xl font-bold mb-6 text-gray-800">Mi Repositorio de Documentos</h1>
 
             {/* Formulario de subida */}
-            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h2 className="text-xl font-semibold mb-4">Subir Nuevo Documento</h2>
+            <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+                <h2 className="text-xl font-semibold mb-4 text-gray-700">Subir Nuevo Documento</h2>
 
                 <form onSubmit={handleUpload} className="space-y-4">
                     <div>
@@ -156,62 +102,27 @@ const DocumentsComponent = () => {
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Título
-                        </label>
-                        <input
-                            type="text"
-                            name="title"
-                            value={uploadForm.title}
-                            onChange={handleInputChange}
-                            placeholder="Título del documento (opcional)"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
                             Tipo de Documento *
                         </label>
-                        <select
-                            name="documentType"
-                            value={uploadForm.documentType}
-                            onChange={handleInputChange}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            required
-                        >
-                            <option value="">Seleccionar tipo...</option>
-                            {documentTypes.map(type => (
-                                <option key={type.id} value={type.id}>
-                                    {type.description} ({type.max_size_mb}MB máx.)
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Descripción
-                        </label>
-                        <textarea
-                            name="description"
-                            value={uploadForm.description}
-                            onChange={handleInputChange}
-                            placeholder="Descripción del documento (opcional)"
-                            rows="3"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Tags
-                        </label>
                         <input
                             type="text"
-                            name="tags"
-                            value={uploadForm.tags}
-                            onChange={handleInputChange}
-                            placeholder="Tags separados por comas (opcional)"
+                            value={tipoDocumento}
+                            onChange={(e) => setTipoDocumento(e.target.value)}
+                            placeholder="Ej: Cédula, Certificado de Antecedentes"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                        />
+                    </div>
+                    
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            ID de Reserva (Opcional)
+                        </label>
+                        <input
+                            type="number"
+                            value={reservaId}
+                            onChange={(e) => setReservaId(e.target.value)}
+                            placeholder="Si el documento es para una reserva específica"
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </div>
@@ -228,55 +139,31 @@ const DocumentsComponent = () => {
 
             {/* Lista de documentos */}
             <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-xl font-semibold mb-4">Mis Documentos</h2>
+                <h2 className="text-xl font-semibold mb-4 text-gray-700">Mis Documentos Subidos</h2>
 
                 {loading ? (
                     <p className="text-center py-4">Cargando documentos...</p>
                 ) : documents.length === 0 ? (
-                    <p className="text-center py-4 text-gray-500">No tienes documentos subidos</p>
+                    <p className="text-center py-4 text-gray-500">No tienes documentos subidos.</p>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="min-w-full table-auto">
-                            <thead>
-                                <tr className="bg-gray-50">
-                                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Archivo</th>
-                                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Tipo</th>
-                                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Tamaño</th>
-                                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Fecha</th>
-                                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Acciones</th>
+                            <thead className="bg-gray-100">
+                                <tr >
+                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 uppercase">Nombre Archivo</th>
+                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 uppercase">Tipo</th>
+                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 uppercase">ID Reserva</th>
+                                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600 uppercase">Fecha de Subida</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody className="divide-y divide-gray-200">
                                 {documents.map(doc => (
-                                    <tr key={doc.id} className="border-t">
-                                        <td className="px-4 py-2">
-                                            <div>
-                                                <div className="font-medium">{doc.original_filename}</div>
-                                                {doc.description && (
-                                                    <div className="text-sm text-gray-500">{doc.description}</div>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-2 text-sm">{doc.type_description}</td>
-                                        <td className="px-4 py-2 text-sm">{doc.size_mb} MB</td>
-                                        <td className="px-4 py-2 text-sm">
+                                    <tr key={doc.id}>
+                                        <td className="px-4 py-3 whitespace-nowrap">{doc.nombre_archivo}</td>
+                                        <td className="px-4 py-3 whitespace-nowrap">{doc.tipo_documento}</td>
+                                        <td className="px-4 py-3 whitespace-nowrap">{doc.reserva_id || 'N/A'}</td>
+                                        <td className="px-4 py-3 whitespace-nowrap">
                                             {new Date(doc.created_at).toLocaleDateString()}
-                                        </td>
-                                        <td className="px-4 py-2">
-                                            <div className="flex space-x-2">
-                                                <button
-                                                    onClick={() => handleDownload(doc.id)}
-                                                    className="text-blue-600 hover:text-blue-800 text-sm"
-                                                >
-                                                    Descargar
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(doc.id)}
-                                                    className="text-red-600 hover:text-red-800 text-sm"
-                                                >
-                                                    Eliminar
-                                                </button>
-                                            </div>
                                         </td>
                                     </tr>
                                 ))}

@@ -1,13 +1,14 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import authAPI from "./services/authAPI"; // Importar el nuevo servicio de autenticación
+import Swal from 'sweetalert2'; // Importar SweetAlert2
 
 const Login = () => {
     const [identifier, setIdentifier] = useState("");
     const [password, setPassword] = useState("");
     const [loginType, setLoginType] = useState("email"); // "email" o "rut"
-    const [err, setErr] = useState("");
-    const [success, setSuccess] = useState("");
+    // const [err, setErr] = useState(""); // Ya no se usa directamente
+    // const [success, setSuccess] = useState(""); // Ya no se usa directamente
     const navigate = useNavigate();
 
     // Función para formatear RUT mientras se escribe (solo si es modo RUT)
@@ -32,172 +33,114 @@ const Login = () => {
     const toggleLoginType = () => {
         setLoginType(loginType === "email" ? "rut" : "email");
         setIdentifier(""); // Limpiar el campo al cambiar
-        setErr(""); // Limpiar errores
+        // setErr(""); // Limpiar errores - ya no se usa directamente
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setErr("");
-        setSuccess("");
+        // setErr(""); // Ya no se usa directamente
+        // setSuccess(""); // Ya no se usa directamente
 
         try {
             await authAPI.login(identifier, password, loginType);
-            setSuccess("✅ Inicio de sesión exitoso!");
+            Swal.fire({
+                icon: 'success',
+                title: 'Inicio de sesión exitoso!',
+                text: 'Redirigiendo...',
+                showConfirmButton: false,
+                timer: 1500
+            });
             navigate('/menu');
 
         } catch (error) {
             const errorMsg = error.response?.data?.detail || error.message;
-            setErr("Error en el login: " + errorMsg);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error de Login',
+                text: 'Error en el login: ' + errorMsg,
+            });
         }
     };
 
     return (
-        <div style={{
-            padding: "20px",
-            maxWidth: "450px",
-            margin: "50px auto",
-            backgroundColor: "white",
-            borderRadius: "8px",
-            boxShadow: "0 2px 10px rgba(0,0,0,0.1)"
-        }}>
-            <h2 style={{ textAlign: "center", marginBottom: "30px", color: "#333" }}>
-                🔐 Iniciar Sesión
-            </h2>
+        <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+            <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-8">
+                <h2 className="text-3xl font-bold text-center text-gray-800 mb-8">
+                    🔐 Iniciar Sesión
+                </h2>
 
-            {/* Toggle de tipo de login */}
-            <div style={{
-                marginBottom: "20px",
-                textAlign: "center",
-                padding: "15px",
-                backgroundColor: "#f8f9fa",
-                borderRadius: "6px",
-                border: "1px solid #e9ecef"
-            }}>
-                <p style={{ marginBottom: "10px", fontWeight: "bold", color: "#495057" }}>
-                    Tipo de inicio de sesión:
-                </p>
-                <button
-                    type="button"
-                    onClick={toggleLoginType}
-                    style={{
-                        padding: "10px 20px",
-                        backgroundColor: loginType === "email" ? "#007bff" : "#6c757d",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "4px",
-                        cursor: "pointer",
-                        fontSize: "14px",
-                        fontWeight: "bold",
-                        transition: "background-color 0.3s"
-                    }}
-                >
-                    {loginType === "email" ? "📧 Ingresar con Email" : "🆔 Ingresar con RUT"}
-                </button>
-                <p style={{ marginTop: "8px", fontSize: "12px", color: "#6c757d" }}>
-                    {loginType === "email"
-                        ? "Haz clic para cambiar a RUT"
-                        : "Haz clic para cambiar a Email"
-                    }
+                {/* Toggle de tipo de login */}
+                <div className="mb-6 text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="mb-2 font-semibold text-gray-700">
+                        Tipo de inicio de sesión:
+                    </p>
+                    <button
+                        type="button"
+                        onClick={toggleLoginType}
+                        className={`px-5 py-2 rounded-md text-white font-bold transition-colors duration-300 ${
+                            loginType === "email" ? "bg-blue-600 hover:bg-blue-700" : "bg-gray-500 hover:bg-gray-600"
+                        }`}
+                    >
+                        {loginType === "email" ? "📧 Ingresar con Email" : "🆔 Ingresar con RUT"}
+                    </button>
+                    <p className="mt-2 text-xs text-gray-500">
+                        {loginType === "email"
+                            ? "Haz clic para cambiar a RUT"
+                            : "Haz clic para cambiar a Email"
+                        }
+                    </p>
+                </div>
+
+                <form onSubmit={handleSubmit}>
+                    {/* Campo de identificador (Email o RUT) */}
+                    <div className="mb-4">
+                        <label className="block text-gray-700 text-sm font-bold mb-2">
+                            {loginType === "email" ? "📧 Email:" : "🆔 RUT:"}
+                        </label>
+                        <input
+                            type={loginType === "email" ? "email" : "text"}
+                            placeholder={loginType === "email" ? "ejemplo@correo.com" : "12.345.678-9"}
+                            value={identifier}
+                            onChange={handleIdentifierChange}
+                            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline focus:border-blue-500"
+                            required
+                            maxLength={loginType === "rut" ? "12" : undefined}
+                        />
+                    </div>
+
+                    {/* Campo de contraseña */}
+                    <div className="mb-6">
+                        <label className="block text-gray-700 text-sm font-bold mb-2">
+                            🔒 Contraseña:
+                        </label>
+                        <input
+                            type="password"
+                            placeholder="Ingresa tu contraseña"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline focus:border-blue-500"
+                            required
+                        />
+                    </div>
+
+                    <button
+                        type="submit"
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg w-full focus:outline-none focus:shadow-outline transition-colors duration-300"
+                    >
+                        🔐 Iniciar Sesión
+                    </button>
+                </form>
+
+                <p className="mt-6 text-center text-gray-600">
+                    ¿No tienes una cuenta?{" "}
+                    <Link
+                        to="/register"
+                        className="text-green-600 hover:text-green-800 font-bold transition-colors duration-300"
+                    >
+                        Registrarse
+                    </Link>
                 </p>
             </div>
-
-            <form onSubmit={handleSubmit}>
-                {/* Campo de identificador (Email o RUT) */}
-                <div style={{ marginBottom: "15px" }}>
-                    <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold" }}>
-                        {loginType === "email" ? "📧 Email:" : "🆔 RUT:"}
-                    </label>
-                    <input
-                        type={loginType === "email" ? "email" : "text"}
-                        placeholder={loginType === "email" ? "ejemplo@correo.com" : "12.345.678-9"}
-                        value={identifier}
-                        onChange={handleIdentifierChange}
-                        style={{
-                            width: "100%",
-                            padding: "12px",
-                            border: "1px solid #ddd",
-                            borderRadius: "4px",
-                            fontSize: "14px"
-                        }}
-                        required
-                        maxLength={loginType === "rut" ? "12" : undefined}
-                    />
-                </div>
-
-                {/* Campo de contraseña */}
-                <div style={{ marginBottom: "20px" }}>
-                    <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold" }}>
-                        🔒 Contraseña:
-                    </label>
-                    <input
-                        type="password"
-                        placeholder="Ingresa tu contraseña"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        style={{
-                            width: "100%",
-                            padding: "12px",
-                            border: "1px solid #ddd",
-                            borderRadius: "4px",
-                            fontSize: "14px"
-                        }}
-                        required
-                    />
-                </div>
-
-                <button
-                    type="submit"
-                    style={{
-                        width: "100%",
-                        padding: "15px",
-                        backgroundColor: "#007bff",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "4px",
-                        fontSize: "16px",
-                        fontWeight: "bold",
-                        cursor: "pointer"
-                    }}
-                >
-                    🔐 Iniciar Sesión
-                </button>
-            </form>
-
-            {success && (
-                <div style={{
-                    color: "green",
-                    marginTop: "15px",
-                    padding: "10px",
-                    backgroundColor: "#d4edda",
-                    border: "1px solid #c3e6cb",
-                    borderRadius: "4px"
-                }}>
-                    {success}
-                </div>
-            )}
-
-            {err && (
-                <div style={{
-                    color: "red",
-                    marginTop: "15px",
-                    padding: "10px",
-                    backgroundColor: "#f8d7da",
-                    border: "1px solid #f5c6cb",
-                    borderRadius: "4px"
-                }}>
-                    {err}
-                </div>
-            )}
-
-            <p style={{ marginTop: "20px", textAlign: "center" }}>
-                ¿No tienes una cuenta?{" "}
-                <Link
-                    to="/register"
-                    style={{ color: "#28a745", textDecoration: "none", fontWeight: "bold" }}
-                >
-                    Registrarse
-                </Link>
-            </p>
         </div>
     );
 };

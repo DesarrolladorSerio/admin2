@@ -58,7 +58,7 @@ Response: { "message": "Contraseña actualizada exitosamente" }
 
 ---
 
-### 3. **Servicio de Documentos (documents-services)**
+### 3. **Servicio de Documentos (documents-service) y Datos Municipalidad (datos-municipalidad-service)**
 
 #### Modificaciones realizadas:
 - ✅ Agregado `httpx==0.27.2` a `requirements.txt`
@@ -170,7 +170,7 @@ celery-worker:
 | `confirmation` | confirmation.html | Crear reservación | reservations-service |
 | `reminder` | reminder.html | Manual/Scheduled | - |
 | `cancellation` | cancellation.html | Cancelar reservación | reservations-service |
-| `document` | document.html | Subir documento | documents-services |
+| `document` | document.html | Subir documento | documents-service / datos-municipalidad-service |
 
 ---
 
@@ -336,7 +336,7 @@ Para cualquier duda sobre la integración, revisar:
 1. Logs del servicio: `docker-compose logs notifications-service`
 2. Logs de Celery: `docker-compose logs celery-worker`
 3. Estado de Redis: `docker-compose exec redis redis-cli monitor`
-4. Logs de servicios individuales: `docker-compose logs auth-service` / `reservations-service` / `documents-services`
+4. Logs de servicios individuales: `docker-compose logs auth-service` / `reservations-service` / `documents-service` / `datos-municipalidad-service`
 
 ---
 

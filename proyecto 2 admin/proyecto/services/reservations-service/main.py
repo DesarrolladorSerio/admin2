@@ -15,8 +15,12 @@ from db_reservas import (
     update_reservation,
 )
 from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.security import HTTPBearer
 from pydantic import BaseModel
 from sqlmodel import Session, select, func
+
+security = HTTPBearer()
+
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -296,7 +300,8 @@ async def delete_reservation_endpoint(
 @app.get("/admin/reservations", response_model=List[ReservationDetailedResponse])
 async def get_all_reservations_detailed(
     session: Session = Depends(get_session),
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    token: str = Depends(security)
 ):
     """
     Endpoint exclusivo para admin/empleados para obtener todas las reservas con información detallada de usuarios
@@ -327,10 +332,11 @@ async def get_all_reservations_detailed(
         
         # Intentar obtener información adicional del usuario
         try:
+            auth_token = token.credentials if hasattr(token, 'credentials') else str(token)
             async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.get(
                     f"http://auth-service:8001/api/auth/user/{reservation.usuario_id}",
-                    headers={"Authorization": f"Bearer {current_user.get('token', '')}"}
+                    headers={"Authorization": f"Bearer {auth_token}"}
                 )
                 
                 if response.status_code == 200:
@@ -667,7 +673,8 @@ def check_availability(
 @app.get("/admin/dashboard")
 async def get_admin_dashboard(
     session: Session = Depends(get_session),
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    token: str = Depends(security)
 ):
     """
     RF08: Dashboard administrativo con listado de reservas y estado documental
@@ -681,7 +688,7 @@ async def get_admin_dashboard(
     from db_reservas import Reservation
     
     # Obtener todas las reservas activas
-    reservas = get_all_reservations(session)
+    reservations = get_all_reservations(session)
     
     # Obtener estadísticas
     total_reservas = session.exec(
@@ -715,12 +722,12 @@ async def get_admin_dashboard(
     
     # Consultar servicio de documentos para información adicional
     try:
-        token = current_user.get("token", "")
+        auth_token = token.credentials if hasattr(token, 'credentials') else str(token)
         async with httpx.AsyncClient() as client:
             # Intentar obtener estadísticas de documentos
             docs_response = await client.get(
                 "http://documents-service:8000/reportes/avance-antiguos",
-                headers={"Authorization": f"Bearer {token}"},
+                headers={"Authorization": f"Bearer {auth_token}"},
                 timeout=5.0
             )
             avance_digitalizacion = docs_response.json() if docs_response.status_code == 200 else None
@@ -738,7 +745,7 @@ async def get_admin_dashboard(
             "docs_incompletos": docs_incompletos,
             "docs_pendientes": docs_pendientes
         },
-        "reservas": reservas,
+        "reservas": reservations,
         "avance_digitalizacion": avance_digitalizacion
     }
 
@@ -884,21 +891,25 @@ async def enviar_notificacion_ciudadano(
 async def consultar_vencimientos(
     dias: int = 30,
     session: Session = Depends(get_session),
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    token: str = Depends(security)
 ):
     """
     RF12: Consultar próximos vencimientos de licencias
     """
     if current_user.get("role") not in ["admin", "employee"]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores y empleados pueden consultar vencimientos"
+        )
     
     try:
-        token = current_user.get("token", "")
+        auth_token = token.credentials if hasattr(token, 'credentials') else str(token)
         async with httpx.AsyncClient() as client:
             # Consultar servicio de autenticación para obtener usuarios con licencias próximas a vencer
             response = await client.get(
                 f"http://auth-service:8000/admin/licencias-por-vencer?dias={dias}",
-                headers={"Authorization": f"Bearer {token}"},
+                headers={"Authorization": f"Bearer {auth_token}"},
                 timeout=10.0
             )
             
