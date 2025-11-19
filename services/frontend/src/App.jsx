@@ -7,7 +7,6 @@ import AdminReservations from './components/AdminReservations';
 import AdminRoute from './components/AdminRoute';
 import DocumentsComponent from './components/DocumentsComponent';
 import RegisterEmployee from './components/RegisterEmployee';
-import ChatBotWidget from './components/ChatBotWidget';
 import DatosMunicipales from './components/DatosMunicipales';
 import AdminReports from './components/AdminReports';
 
@@ -52,8 +51,7 @@ function AppContent() {
         <Route path="*" element={<Navigate to="/login" />} />
       </Routes>
 
-      {/* ChatBot Widget - Solo visible para usuarios autenticados */}
-      {isAuthenticated() && !isAuthPage() && <ChatBotWidget key={location.pathname} />}
+      {/* (Chatbot removido) */}
     </div>
   );
 }

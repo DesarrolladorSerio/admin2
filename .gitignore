@@ -64,3 +64,11 @@ infrastructure/postgres/documents-replica-data/
 .idea/
 .vscode/
 *.code-workspace
+
+# ================================================
+# Security / Certificates
+# ================================================
+infrastructure/certs/
+*.key
+*.crt
+*.pem
