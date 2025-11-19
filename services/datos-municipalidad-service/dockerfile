@@ -1,0 +1,44 @@
+FROM python:3.11.9-slim
+
+LABEL maintainer="Augusto Fuenzalida <augusto@utalca.cl>" \
+    version="1.0" \
+    description="Microservicio FastAPI - datos-municipalidad-service"
+
+# Instalar dependencias del sistema necesarias (minimizar capas y limpiar cache)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    libmagic1 \
+    libmagic-dev \
+    curl \
+    wget \
+    file \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copiar requirements e instalar dependencias con reintentos
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip --timeout 300 --retries 3 \
+    && (pip install --no-cache-dir -r requirements.txt --timeout 300 --retries 3 || \
+        (echo "Retrying pip install with different settings..." && \
+         pip install --no-cache-dir -r requirements.txt --timeout 600 --retries 5 --trusted-host pypi.org --trusted-host files.pythonhosted.org))
+
+# Copiar aplicación
+COPY . .
+
+# Crear directorios y usuario no-root
+RUN mkdir -p /app/uploads /app/temp \
+    && useradd -m appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+
+ENV PORT=8006
+EXPOSE ${PORT}
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=5 \
+    CMD ["sh", "-c", "curl -f http://localhost:${PORT}/health || exit 1"]
+
+# Ejecutar la aplicación (expande ${PORT} mediante sh -c)
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT}"]
