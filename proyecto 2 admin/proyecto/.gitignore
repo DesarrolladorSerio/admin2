@@ -50,7 +50,10 @@ db_data/
 *-primary-data/
 *-replica-data/
 pgdata/
-*.conf
+# *.conf  # Comentado para permitir nginx.conf en servicios
+# Ignorar solo archivos .conf específicos que no sean de configuración de servicios
+infrastructure/postgres/**/*.conf
+!services/**/nginx.conf
 infrastructure/postgres/auth-primary-data/
 infrastructure/postgres/auth-replica-data/
 infrastructure/postgres/reservations-primary-data/

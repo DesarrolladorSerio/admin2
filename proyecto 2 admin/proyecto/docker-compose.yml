@@ -1,7 +1,7 @@
 services:
 
-#Bases de datos : 
-#------------------------------------------#
+  #Bases de datos : 
+  #------------------------------------------#
 
   # ==========================
   # 🗄️ Autenticacion
@@ -23,10 +23,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: 128M
+          cpus: "0.2"
+          memory: 64M
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${AUTH_DB_USER} -d ${AUTH_DB_NAME}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${AUTH_DB_USER} -d ${AUTH_DB_NAME}" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -38,6 +38,7 @@ services:
     #   docker compose exec auth-db-replica pg_ctl -D /var/lib/postgresql/data promote
     networks:
       database_net:
+
 
   auth-db-replica:
     image: postgres:16.4
@@ -70,7 +71,7 @@ services:
     volumes:
       - auth_replica_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432"]
+      test: [ "CMD-SHELL", "pg_isready -h localhost -p 5432" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -99,10 +100,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: 128M
+          cpus: "0.2"
+          memory: 64M
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${RESERVATIONS_DB_USER} -d ${RESERVATIONS_DB_NAME}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${RESERVATIONS_DB_USER} -d ${RESERVATIONS_DB_NAME}" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -147,10 +148,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.2"
-          memory: 64M
+          cpus: "0.1"
+          memory: 32M
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432"]
+      test: [ "CMD-SHELL", "pg_isready -h localhost -p 5432" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -177,10 +178,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: 128M
+          cpus: "0.2"
+          memory: 64M
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DOCUMENTS_DB_USER:-postgres} -d ${DOCUMENTS_DB_NAME:-documents}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${DOCUMENTS_DB_USER:-postgres} -d ${DOCUMENTS_DB_NAME:-documents}" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -189,11 +190,11 @@ services:
     networks:
       database_net:
 
-  # ==========================
-  # 🗄️ Base de datos de ChatBot IA
-  # ==========================
-  # 🗄️ Base de datos de ChatBot IA (SIN RÉPLICA)
-  # ==========================
+        # ==========================
+        # 🗄️ Base de datos de ChatBot IA
+        # ==========================
+        # 🗄️ Base de datos de ChatBot IA (SIN RÉPLICA)
+        # ==========================
   chatbot-db:
     image: postgres:16.4
     container_name: chatbot_db
@@ -209,10 +210,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: 128M
+          cpus: "0.2"
+          memory: 64M
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${CHATBOT_DB_USER:-admin} -d ${CHATBOT_DB_NAME:-chatbot_db}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${CHATBOT_DB_USER:-admin} -d ${CHATBOT_DB_NAME:-chatbot_db}" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -221,9 +222,9 @@ services:
     networks:
       database_net:
 
-  # ==========================
-  # 📦 MinIO - Almacenamiento de archivos
-  # ==========================
+        # ==========================
+        # 📦 MinIO - Almacenamiento de archivos
+        # ==========================
   minio:
     image: minio/minio:RELEASE.2024-07-26T20-48-21Z
     container_name: minio_storage
@@ -233,16 +234,16 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
     ports:
       - "${MINIO_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"  
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
       - minio_data:/data
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: 256M
+          cpus: "0.2"
+          memory: 128M
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -250,9 +251,9 @@ services:
     networks:
       storage_net:
 
-  # ==========================
-  # 🔴 Redis - Sistema de Cola
-  # ==========================
+        # ==========================
+        # 🔴 Redis - Sistema de Cola
+        # ==========================
   redis:
     image: redis:7-alpine
     container_name: redis_queue
@@ -262,27 +263,27 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
     deploy:
       resources:
         limits:
-          cpus: "0.2"
-          memory: 64M
+          cpus: "0.1"
+          memory: 32M
     restart: unless-stopped
     networks:
       backend_net:
 
-  # ==========================
-  # ⚙️ Servicio de Autenticación (FastAPI)
-  # Nota: duplicado en `auth-service-1` y `auth-service-2` para alta disponibilidad
-  # (el servicio original fue sustituido por dos instancias para el clúster HA)
+        # ==========================
+        # ⚙️ Servicio de Autenticación (FastAPI)
+        # Nota: duplicado en `auth-service-1` y `auth-service-2` para alta disponibilidad
+        # (el servicio original fue sustituido por dos instancias para el clúster HA)
 
-  # --------------------------
-  # ⚙️ Servicio de Autenticación - réplica activa (instancias duplicadas)
-  # --------------------------
+        # --------------------------
+        # ⚙️ Servicio de Autenticación - réplica activa (instancias duplicadas)
+        # --------------------------
   auth-service-1:
     build:
       context: ./services/auth-service
@@ -302,10 +303,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: 256M
+          cpus: "0.2"
+          memory: 128M
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8000/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -332,10 +333,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: 256M
+          cpus: "0.2"
+          memory: 128M
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8000/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -367,10 +368,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: 256M
+          cpus: "0.2"
+          memory: 128M
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8002/health"]
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8002/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -397,10 +398,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: 256M
+          cpus: "0.2"
+          memory: 128M
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8002/health"]
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8002/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -441,10 +442,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: 256M
+          cpus: "0.2"
+          memory: 128M
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8003/health"]
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8003/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -491,10 +492,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: 256M
+          cpus: "0.2"
+          memory: 128M
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -503,9 +504,9 @@ services:
     networks:
       backend_net:
 
-  # ==========================
-  # ⚙️ Celery Worker (Procesamiento de Cola)
-  # ==========================
+        # ==========================
+        # ⚙️ Celery Worker (Procesamiento de Cola)
+        # ==========================
   celery-worker:
     build:
       context: ./services/notificacion-service
@@ -534,10 +535,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: 256M
+          cpus: "0.2"
+          memory: 128M
     healthcheck:
-      test: ["CMD", "celery", "-A", "celery_config", "inspect", "ping"]
+      test: [ "CMD", "celery", "-A", "celery_config", "inspect", "ping" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -546,9 +547,9 @@ services:
     networks:
       backend_net:
 
-  # ==========================
-  # 🤖 Servicio de ChatBot IA (INSTANCIA ÚNICA)
-  # ==========================
+        # ==========================
+        # 🤖 Servicio de ChatBot IA (INSTANCIA ÚNICA)
+        # ==========================
   chatbot-service:
     build:
       context: ./services/ai-service
@@ -559,7 +560,7 @@ services:
     environment:
       DATABASE_URL: "postgresql+psycopg://${CHATBOT_DB_USER:-admin}:${CHATBOT_DB_PASSWORD:-admin}@chatbot-db:5432/${CHATBOT_DB_NAME:-chatbot_db}"
       OLLAMA_BASE_URL: "http://ollama:11434"
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama2}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-tinyllama}
       OLLAMA_TIMEOUT: ${OLLAMA_TIMEOUT:-60}
       REDIS_HOST: "redis"
       REDIS_PORT: "6379"
@@ -583,10 +584,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: 256M
+          cpus: "0.2"
+          memory: 128M
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8005/health"]
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8005/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -609,29 +610,29 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "1.0"
-          memory: 2G
+          cpus: "0.5"
+          memory: 1G
     restart: unless-stopped
     networks:
       - backend_net
     healthcheck:
-      test: ["CMD", "/bin/ollama", "list"]
+      test: [ "CMD", "/bin/ollama", "list" ]
       interval: 30s
       timeout: 10s
       retries: 20
       start_period: 600s
     # Comando para descargar modelo al inicio (si no existe)
-    entrypoint: ["/bin/sh", "-c"]
+    entrypoint: [ "/bin/sh", "-c" ]
     command:
       - |
         /bin/ollama serve &
-        OLLAMA_PID=$$!
+        OLLAMA_PID=$!
         echo "⏳ Esperando que Ollama inicie..."
         sleep 10
-        echo "📥 Descargando modelo llama2 (esto puede tardar en el primer inicio)..."
-        /bin/ollama pull llama2 || echo "⚠️  Advertencia: No se pudo descargar el modelo automáticamente. Ejecuta: docker exec ollama_service ollama pull llama2"
-        echo "✅ Ollama listo con modelo llama2"
-        wait $$OLLAMA_PID
+        echo "📥 Descargando modelo tinyllama (más pequeño, menos RAM: ~400MB vs 3.8GB de llama2)..."
+        /bin/ollama pull tinyllama || echo "⚠️  Advertencia: No se pudo descargar el modelo automáticamente. Ejecuta: docker exec ollama_service ollama pull tinyllama"
+        echo "✅ Ollama listo con modelo tinyllama (optimizado para bajo uso de RAM)"
+        wait $OLLAMA_PID
 
   # ==========================
   # 📂 Servicio de Datos Municipalidad (FastAPI)
@@ -665,10 +666,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: 256M
+          cpus: "0.2"
+          memory: 128M
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8006/health"]
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8006/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -692,13 +693,13 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.2"
-          memory: 128M
+          cpus: "0.1"
+          memory: 64M
     restart: unless-stopped
     networks:
       - frontend_net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost"]
+      test: [ "CMD", "curl", "-f", "http://localhost" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -717,8 +718,6 @@ services:
         condition: service_healthy
       auth-service-2:
         condition: service_healthy
-      frontend:
-        condition: service_healthy
       reservations-service-1:
         condition: service_healthy
       reservations-service-2:
@@ -736,15 +735,15 @@ services:
       - backend_net
     healthcheck:
       # Try wget first, fallback to curl if wget is not available
-      test: ["CMD-SHELL", "wget -qO- http://localhost/health || curl -f http://localhost/health"]
+      test: [ "CMD-SHELL", "wget -qO- http://localhost/health || curl -f http://localhost/health" ]
       interval: 30s
       timeout: 10s
       retries: 5
     deploy:
       resources:
         limits:
-          cpus: "0.2"
-          memory: 128M
+          cpus: "0.1"
+          memory: 64M
     restart: unless-stopped
 
   # ==========================
@@ -810,16 +809,16 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.2"
-          memory: 128M
+          cpus: "0.1"
+          memory: 64M
     networks:
       - database_net
       - storage_net
     restart: unless-stopped
 
-# ==========================
-# Monitoring services
-# ==========================
+  # ==========================
+  # Monitoring services
+  # ==========================
   prometheus:
     image: prom/prometheus:v2.49.0
     container_name: prometheus
@@ -832,8 +831,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: 256M
+          cpus: "0.2"
+          memory: 128M
     networks:
       - backend_net
       - prometheus_net
@@ -850,8 +849,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.2"
-          memory: 128M
+          cpus: "0.1"
+          memory: 64M
     networks:
       - prometheus_net
       - backend_net
@@ -876,8 +875,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: 256M
+          cpus: "0.2"
+          memory: 128M
     networks:
       - backend_net
       - prometheus_net
@@ -1008,28 +1007,28 @@ services:
 # ==========================
 volumes:
   minio_data:
-  redis_data:
-  # Auth DB con réplica (HA)
+  redis_data: # Auth DB con réplica (HA)
+
   auth_primary_data:
-  auth_replica_data:
-  # Reservations DB con réplica (HA)
+  auth_replica_data: # Reservations DB con réplica (HA)
+
   reservations_primary_data:
-  reservations_replica_data:
-  # Documents DB sin réplica (optimizado)
-  documents_data:
-  # ChatBot DB sin réplica (optimizado)
-  chatbot_data:
-  # Ollama - Modelos de IA local (100% GRATUITO)
-  ollama_models:
-  # Backups
-  pg_backups:
-  # Monitoring
+  reservations_replica_data: # Documents DB sin réplica (optimizado)
+
+  documents_data: # ChatBot DB sin réplica (optimizado)
+
+  chatbot_data: # Ollama - Modelos de IA local (100% GRATUITO)
+
+  ollama_models: # Backups
+
+  pg_backups: # Monitoring
+
   prometheus_data:
   grafana_data:
 
-# ==========================
-# Redes
-# ==========================
+    # ==========================
+    # Redes
+    # ==========================
 networks:
   frontend_net:
     driver: bridge

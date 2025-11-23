@@ -193,8 +193,8 @@ class ChatBotService:
             {"role": "system", "content": self.system_context}
         ]
         
-        # Agregar historial reciente
-        history = self.get_conversation_history(db, session.session_id, limit=8)
+        # Agregar historial reciente (REDUCIDO PARA AHORRAR RAM)
+        history = self.get_conversation_history(db, session.session_id, limit=4)
         for msg in history:
             messages.append({
                 "role": msg.role,
@@ -246,14 +246,14 @@ class ChatBotService:
             # Construir contexto de conversación
             messages = self._build_conversation_context(db, session, enhanced_message)
             
-            # Llamada a Ollama (local, sin costos)
+            # Llamada a Ollama (local, sin costos) - OPTIMIZADO PARA MENOS RAM
             response = self.ollama_client.chat(
                 model=settings.OLLAMA_MODEL,
                 messages=messages,
                 options={
                     'temperature': 0.7,
-                    'num_predict': 500,  # Equivalente a max_tokens
-                    'num_ctx': 2048,  # Contexto ajustado para tinyllama (evita warning)
+                    'num_predict': 150,  # Reducido de 500 a 150 tokens para ahorrar RAM
+                    'num_ctx': 1024,  # Reducido de 2048 a 1024 para menos memoria
                 }
             )
             
