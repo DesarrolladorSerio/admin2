@@ -1,4 +1,25 @@
-# ======== Etapa de construcción optimizada ========
+# ======== Etapa de construcción ========
+FROM python:3.11.9-slim AS builder
+
+LABEL maintainer="Augusto Fuenzalida <augusto@utalca.cl>" \
+  version="1.0" \
+  description="Microservicio FastAPI - reservations-service"
+
+# Configurar variables de entorno para optimizar memoria
+ENV PYTHONUNBUFFERED=1 \
+  PYTHONDONTWRITEBYTECODE=1 \
+  PIP_NO_CACHE_DIR=1 \
+  PIP_DISABLE_PIP_VERSION_CHECK=1 \
+  MALLOC_ARENA_MAX=2
+
+WORKDIR /app
+
+# Copiar requirements y crear wheels
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip --timeout 300 --retries 3 && \
+  pip wheel --no-cache-dir -r requirements.txt -w /wheels --timeout 300 --retries 3
+
+# ======== Etapa de ejecución ========
 FROM python:3.11.9-slim
 
 LABEL maintainer="Augusto Fuenzalida <augusto@utalca.cl>" \
@@ -14,26 +35,30 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Copiar requirements e instalar dependencias con reintentos
-COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip --timeout 300 --retries 3 \
-  && (pip install --no-cache-dir -r requirements.txt --timeout 300 --retries 3 || \
-      (echo "Retrying pip install with different settings..." && \
-       pip install --no-cache-dir -r requirements.txt --timeout 600 --retries 5 --trusted-host pypi.org --trusted-host files.pythonhosted.org)) \
-  && find /usr/local -type d -name '__pycache__' -exec rm -rf {} + \
-  && find /usr/local -type f -name '*.pyc' -delete
+# Instalar herramientas necesarias para healthcheck (curl)
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends curl && \
+  apt-get clean && \
+  rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# instalar herramientas necesarias para healthcheck (curl)
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends curl \
-  && apt-get clean \
-  && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+# Copiar wheels desde la etapa de construcción
+COPY --from=builder /wheels /wheels
+
+# Instalar dependencias desde wheels
+RUN pip install --no-cache-dir /wheels/* && \
+  rm -rf /wheels && \
+  find /usr/local -type d -name '__pycache__' -exec rm -rf {} + && \
+  find /usr/local -type f -name '*.pyc' -delete
 
 # Copiar aplicación
 COPY . .
 
 # Crear usuario no-root y ajustar permisos
-RUN useradd --system --no-create-home appuser && chown -R appuser /app
+RUN groupadd -r appgroup && \
+  useradd --system --no-create-home -G appgroup appuser && \
+  chown -R appuser:appgroup /app && \
+  chmod -R 750 /app
+
 USER appuser
 
 ENV PORT=8000

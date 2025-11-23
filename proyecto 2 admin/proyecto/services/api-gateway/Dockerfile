@@ -11,8 +11,8 @@ RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf && \
     apk update && \
     apk add --no-cache wget curl || \
     (echo "Retrying with different mirror..." && \
-     sed -i 's/dl-cdn.alpinelinux.org/alpine.global.ssl.fastly.net/g' /etc/apk/repositories && \
-     apk update && apk add --no-cache wget curl)
+    sed -i 's/dl-cdn.alpinelinux.org/alpine.global.ssl.fastly.net/g' /etc/apk/repositories && \
+    apk update && apk add --no-cache wget curl)
 
 # Crear y ajustar permisos para directorios usados por Nginx
 RUN mkdir -p /var/cache/nginx /var/run /var/log/nginx && \
@@ -26,8 +26,6 @@ COPY 50x.html /usr/share/nginx/html/50x.html
 
 # Exponer puerto HTTP
 EXPOSE 80
-
-# Cambiar a usuario no root
 
 # Cambiar a usuario no root
 USER nginx
