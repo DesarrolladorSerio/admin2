@@ -43,6 +43,9 @@ class AuthAPI {
       if (response.data.access_token) {
         console.log('💾 Guardando token en localStorage...');
 
+        // Limpiar sesión de chatbot anterior antes de guardar el nuevo token
+        localStorage.removeItem('chatbot_session_id');
+        localStorage.removeItem('chatbot_messages');
 
         localStorage.setItem('authToken', response.data.access_token);
         console.log('💾 Token guardado exitosamente');
@@ -77,7 +80,10 @@ class AuthAPI {
     localStorage.removeItem('authToken');
     localStorage.removeItem('token'); // Por si se usa este nombre en algún lugar
 
-    // Limpieza específica de chatbot eliminada
+    // Limpiar sesión del chatbot
+    localStorage.removeItem('chatbot_session_id');
+    localStorage.removeItem('chatbot_messages');
+    localStorage.removeItem('chatbot_user'); // 👈 Nuevo: Limpiar usuario del chatbot
 
     // Redirigir al login
     window.location.href = '/login';
