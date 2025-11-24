@@ -1,5 +1,0 @@
-   1. Reconstruye los contenedores:
-   1     docker-compose up -d --build
-   2. Prueba el registro recordando las reglas:
-       * El nombre de usuario debe ser un email válido.
-       * La contraseña debe tener al menos 8 caracteres.

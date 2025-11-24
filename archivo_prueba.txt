@@ -1,0 +1,22 @@
+Archivo de Prueba - Sistema de Documentos Municipal
+
+Este es un archivo de prueba para validar el funcionamiento del sistema de gestión de documentos.
+
+Fecha de creación: 6 de noviembre de 2025
+Usuario de prueba: 21506068-3
+Sistema: Gestión Municipal de Documentos
+
+Contenido de prueba:
+- Validación de subida de archivos
+- Verificación de autenticación
+- Prueba de almacenamiento en MinIO
+- Test de metadatos en base de datos
+
+Este archivo será utilizado para comprobar que:
+1. El usuario puede autenticarse correctamente
+2. Los archivos se suben al sistema MinIO
+3. Los metadatos se almacenan en PostgreSQL
+4. El archivo se puede descargar posteriormente
+
+---
+Fin del archivo de prueba
