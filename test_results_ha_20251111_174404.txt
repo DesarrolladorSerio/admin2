@@ -1,0 +1,91 @@
+=================================================================
+REPORTE DE PRUEBAS DE ALTA DISPONIBILIDAD Y REPLICACION
+Fecha: 2025-11-11 17:44:04
+=================================================================
+
+PRUEBAS REALIZADAS:
+
+1. ALTA DISPONIBILIDAD - SERVICIO DE AUTENTICACION
+   ✓ Estado inicial: 2 réplicas funcionando (auth-service-1, auth-service-2)
+   ✓ Endpoint verificado: http://localhost:8081/api/auth/health
+   ✓ Respuesta inicial: {"status":"ok"}
+   ✓ Réplica detenida: auth-service-1
+   ✓ Servicio continúa respondiendo: {"status":"ok"}
+   ✓ Réplica recuperada exitosamente
+   RESULTADO: ✓ EXITOSO - El balanceo de carga funciona correctamente
+
+2. ALTA DISPONIBILIDAD - SERVICIO DE RESERVACIONES  
+   ✓ Estado inicial: 2 réplicas funcionando (reservations-service-1, reservations-service-2)
+   ✓ Endpoint verificado: http://localhost:8081/api/reservations/health
+   ✓ Respuesta inicial: {"status":"ok","service":"reservations"}
+   ✓ Réplica detenida: reservations-service-1
+   ✓ Servicio continúa respondiendo correctamente
+   ✓ Réplica recuperada exitosamente
+   RESULTADO: ✓ EXITOSO - El balanceo de carga funciona correctamente
+
+3. REPLICACION POSTGRESQL
+   Estado: ⚠ CONFIGURACION PENDIENTE
+   - Base de datos primaria funcionando: auth-db
+   - Réplica con problemas de conexión: auth_db_replica
+   - Error: "no pg_hba.conf entry for replication connection"
+   - Tabla de prueba creada exitosamente en primario
+   - Datos insertados: "registro desde primario - prueba HA"
+   NOTA: Se requiere ajustar configuración pg_hba.conf para permitir 
+         conexiones de replicación desde las réplicas
+
+4. MONITOREO CON PROMETHEUS
+   ✓ Prometheus funcionando en: http://localhost:9090/
+   ✓ Targets monitoreados:
+     - Node Exporter: UP
+     - Postgres Exporter (Auth): UP
+     - Postgres Exporter (Reservations): UP
+     - Postgres Exporter (Documents): UP
+     - Postgres Exporter (Chatbot): UP
+   RESULTADO: ✓ EXITOSO - Sistema de monitoreo operativo
+
+5. GRAFANA
+   ✓ Grafana funcionando en: http://localhost:3001/
+   ✓ Versión: 9.5.8
+   ✓ Base de datos: OK
+   RESULTADO: ✓ EXITOSO - Plataforma de visualización operativa
+
+6. BACKUP MANUAL
+   Estado: ⚠ ERROR EN SCRIPT
+   - Error al ejecutar /app/backup.sh
+   - Script no encontrado o problema de formato de archivo
+   NOTA: Se requiere revisar el script de backup
+
+=================================================================
+CONCLUSIONES:
+=================================================================
+
+✓ ALTA DISPONIBILIDAD: Funcionando correctamente
+  - El API Gateway (Nginx) balancea correctamente entre réplicas
+  - Los servicios continúan operando cuando una réplica falla
+  - La recuperación de réplicas es exitosa
+
+⚠ REPLICACION: Requiere configuración
+  - Las bases de datos primarias están operativas
+  - Se requiere ajustar pg_hba.conf para permitir replicación
+  - La infraestructura para replicación está lista
+
+✓ MONITOREO: Completamente operativo
+  - Prometheus recolectando métricas correctamente
+  - Grafana disponible para visualización
+  - Exporters funcionando (Node, PostgreSQL, Redis)
+
+⚠ BACKUPS: Requiere revisión
+  - Script de backup necesita corrección
+
+=================================================================
+SERVICIOS VERIFICADOS FUNCIONANDO:
+=================================================================
+- API Gateway (Nginx): http://localhost:8081/
+- Frontend: http://localhost:3000/
+- Prometheus: http://localhost:9090/
+- Grafana: http://localhost:3001/
+- Alertmanager: http://localhost:9093/
+- MinIO: http://localhost:9000/ y http://localhost:9001/
+- Ollama (IA): http://localhost:11434/
+
+=================================================================

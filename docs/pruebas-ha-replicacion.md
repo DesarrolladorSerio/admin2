@@ -124,18 +124,18 @@ Para agilizar la demostración y ver estados / alertas sin navegar manualmente:
 - Postgres Auth: http://localhost:9187/metrics
 - Postgres Reservas: http://localhost:9188/metrics
 - Postgres Documentos: http://localhost:9189/metrics
- 
+- Postgres Chatbot: http://localhost:9190/metrics
 
 ### Servicios de infraestructura
 - MinIO Console: http://localhost:9001/ (usuario: `${MINIO_ACCESS_KEY}`, contraseña: `${MINIO_SECRET_KEY}`)
 - MinIO API: http://localhost:9000/
- 
+- Ollama (IA local): http://localhost:11434/
 
 ### Bases de datos (puertos expuestos)
 - Auth DB (Primary): localhost:5432
 - Reservations DB (Primary): localhost:5433
 - Documents DB: localhost:5434
- 
+- Chatbot DB: localhost:5436
 
 ### Frontend y Gateway
 - Frontend (React): http://localhost:3000/

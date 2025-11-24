@@ -1,0 +1,18 @@
+﻿========================================
+REPORTE DE PRUEBAS AUTOMATIZADAS
+Sistema Municipal de Reservaciones
+========================================
+
+Fecha: 2025-11-09 20:43:47
+
+RESULTADOS:
+- Total de pruebas: 26
+- Exitosas: 25
+- Fallidas: 1
+- Tasa de Ã©xito: 96.15%
+
+CONTENEDORES:
+- Total en ejecuciÃ³n: 32
+- Healthy: 0
+
+========================================
