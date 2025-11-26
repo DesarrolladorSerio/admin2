@@ -1,6 +1,8 @@
 # Lightweight image with pg_dump available and busybox crond
 FROM postgres:16-alpine
 
+# Security: Run vulnerability scan with: trivy image <image-name>
+
 # Install tools: curl (for downloading mc), bash, tzdata
 RUN apk add --no-cache bash curl ca-certificates tzdata && update-ca-certificates
 
@@ -17,7 +19,11 @@ COPY restore-db.sh /app/restore-db.sh
 COPY entrypoint.sh /app/entrypoint.sh
 
 RUN chmod +x /app/*.sh \
-    && mkdir -p /backups
+    && mkdir -p /backups \
+    && chown -R postgres:postgres /app /backups
+
+# Switch to non-privileged user
+USER postgres
 
 # Run entrypoint which installs the cron job from BACKUP_SCHEDULE and runs crond in foreground
 ENTRYPOINT ["/app/entrypoint.sh"]

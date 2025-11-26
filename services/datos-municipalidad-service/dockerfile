@@ -1,44 +1,67 @@
+# ======== Stage 1: Builder ========
+FROM python:3.11.9-slim AS builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    libmagic-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install dependencies to user directory
+COPY requirements.txt .
+RUN pip install --upgrade setuptools && pip install --user --no-cache-dir -r requirements.txt
+
+# ======== Stage 2: Runtime ========
 FROM python:3.11.9-slim
+
+# Update OS and system python packages
+RUN apt-get update && apt-get upgrade -y && \
+    pip install --upgrade pip setuptools && \
+    rm -rf /var/lib/apt/lists/*
 
 LABEL maintainer="Augusto Fuenzalida <augusto@utalca.cl>" \
     version="1.0" \
     description="Microservicio FastAPI - datos-municipalidad-service"
 
-# Instalar dependencias del sistema necesarias (minimizar capas y limpiar cache)
+# Security: Run vulnerability scan with: trivy image <image-name>
+
+WORKDIR /app
+
+# Install runtime dependencies
 RUN apt-get update \
+    && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends \
-    gcc \
-    g++ \
     libmagic1 \
-    libmagic-dev \
     curl \
     wget \
     file \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# Create non-privileged user
+RUN useradd -m appuser
 
-# Copiar requirements e instalar dependencias con reintentos
-COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip --timeout 300 --retries 3 \
-    && (pip install --no-cache-dir -r requirements.txt --timeout 300 --retries 3 || \
-        (echo "Retrying pip install with different settings..." && \
-         pip install --no-cache-dir -r requirements.txt --timeout 600 --retries 5 --trusted-host pypi.org --trusted-host files.pythonhosted.org))
+# Copy dependencies from builder
+COPY --from=builder /root/.local /home/appuser/.local
 
-# Copiar aplicación
+# Copy application code
 COPY . .
 
-# Crear directorios y usuario no-root
+# Create directories and set permissions
 RUN mkdir -p /app/uploads /app/temp \
-    && useradd -m appuser \
     && chown -R appuser:appuser /app
+
+# Switch to non-privileged user
 USER appuser
 
+ENV PATH=/home/appuser/.local/bin:$PATH
 ENV PORT=8006
 EXPOSE ${PORT}
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=5 \
     CMD ["sh", "-c", "curl -f http://localhost:${PORT}/health || exit 1"]
 
-# Ejecutar la aplicación (expande ${PORT} mediante sh -c)
+# Run the application
 CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT}"]

@@ -29,14 +29,17 @@ LABEL maintainer="Augusto Fuenzalida" \
       version="1.0" \
       description="Frontend compilado servido con Nginx"
 
+# Security: Run vulnerability scan with: trivy image <image-name>
+
 # Configurar DNS y instalar herramientas para healthcheck
 RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf && \
     echo "nameserver 1.1.1.1" >> /etc/resolv.conf && \
     apk update && \
+    apk upgrade --no-cache && \
     apk add --no-cache wget curl || \
     (echo "Retrying with different mirror..." && \
      sed -i 's/dl-cdn.alpinelinux.org/alpine.global.ssl.fastly.net/g' /etc/apk/repositories && \
-     apk update && apk add --no-cache wget curl)
+     apk update && apk upgrade --no-cache && apk add --no-cache wget curl)
 
 # Crear y dar permisos a directorios usados por Nginx
 RUN mkdir -p /var/cache/nginx /var/run /var/log/nginx && \

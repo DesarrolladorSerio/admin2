@@ -1,0 +1,291 @@
+x-security: &security
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  deploy:
+    resources:
+      limits:
+        cpus: "0.5"
+        memory: 512M
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+x-security-db: &security-db
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  cap_add:
+    - CHOWN
+    - SETGID
+    - SETUID
+    - DAC_OVERRIDE
+  deploy:
+    resources:
+      limits:
+        cpus: "0.5"
+        memory: 512M
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+services:
+  # =============================================================================
+  # DATABASES
+  # =============================================================================
+  
+  auth-db:
+    build: ./infrastructure/database/postgres-custom
+    container_name: auth-db
+    restart: unless-stopped
+    <<: *security-db
+    environment:
+      POSTGRES_USER: ${AUTH_DB_USER}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD}
+      POSTGRES_DB: ${AUTH_DB_NAME}
+    ports:
+      - "${AUTH_DB_PORT}:5432"
+    volumes:
+      - auth_db_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/auth-init:/docker-entrypoint-initdb.d
+    networks:
+      - app-network
+
+  reservations-db:
+    build: ./infrastructure/database/postgres-custom
+    container_name: reservations-db
+    restart: unless-stopped
+    <<: *security-db
+    environment:
+      POSTGRES_USER: ${RESERVATIONS_DB_USER}
+      POSTGRES_PASSWORD: ${RESERVATIONS_DB_PASSWORD}
+      POSTGRES_DB: ${RESERVATIONS_DB_NAME}
+    ports:
+      - "${RESERVATIONS_DB_PORT}:5432"
+    volumes:
+      - reservations_db_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/reservations-init:/docker-entrypoint-initdb.d
+    networks:
+      - app-network
+
+  documents-db:
+    build: ./infrastructure/database/postgres-custom
+    container_name: documents-db
+    restart: unless-stopped
+    <<: *security-db
+    environment:
+      POSTGRES_USER: ${DOCUMENTS_DB_USER}
+      POSTGRES_PASSWORD: ${DOCUMENTS_DB_PASSWORD}
+      POSTGRES_DB: ${DOCUMENTS_DB_NAME}
+    ports:
+      - "${DOCUMENTS_DB_PORT}:5432"
+    volumes:
+      - documents_db_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/documents-init:/docker-entrypoint-initdb.d
+    networks:
+      - app-network
+
+  redis:
+    build: ./infrastructure/database/redis-custom
+    container_name: redis
+    restart: unless-stopped
+    <<: *security-db
+    ports:
+      - "${REDIS_PORT}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+
+  minio:
+    build: ./infrastructure/database/minio-custom
+    container_name: minio
+    restart: unless-stopped
+    <<: *security-db
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    ports:
+      - "${MINIO_PORT}:9000"
+      - "${MINIO_CONSOLE_PORT}:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - app-network
+
+  # =============================================================================
+  # BACKEND SERVICES
+  # =============================================================================
+
+  auth-service-1:
+    build: ./services/auth-service
+    container_name: auth-service-1
+    restart: unless-stopped
+    <<: *security
+    environment:
+      DATABASE_URL: postgresql://${AUTH_DB_USER}:${AUTH_DB_PASSWORD}@auth-db:5432/${AUTH_DB_NAME}
+      SECRET_KEY: ${SECRET_KEY}
+      ALGORITHM: ${ALGORITHM}
+      PORT: 8000
+    depends_on:
+      - auth-db
+    networks:
+      - app-network
+
+  auth-service-2:
+    build: ./services/auth-service
+    container_name: auth-service-2
+    restart: unless-stopped
+    <<: *security
+    environment:
+      DATABASE_URL: postgresql://${AUTH_DB_USER}:${AUTH_DB_PASSWORD}@auth-db:5432/${AUTH_DB_NAME}
+      SECRET_KEY: ${SECRET_KEY}
+      ALGORITHM: ${ALGORITHM}
+      PORT: 8000
+    depends_on:
+      - auth-db
+    networks:
+      - app-network
+
+  reservations-service-1:
+    build: ./services/reservations-service
+    container_name: reservations-service-1
+    restart: unless-stopped
+    <<: *security
+    environment:
+      DATABASE_URL: postgresql://${RESERVATIONS_DB_USER}:${RESERVATIONS_DB_PASSWORD}@reservations-db:5432/${RESERVATIONS_DB_NAME}
+      AUTH_SERVICE_URL: http://auth_cluster:8000
+      NOTIFICATIONS_SERVICE_URL: http://notifications-service:8004
+      PORT: 8002
+    depends_on:
+      - reservations-db
+    networks:
+      - app-network
+
+  reservations-service-2:
+    build: ./services/reservations-service
+    container_name: reservations-service-2
+    restart: unless-stopped
+    <<: *security
+    environment:
+      DATABASE_URL: postgresql://${RESERVATIONS_DB_USER}:${RESERVATIONS_DB_PASSWORD}@reservations-db:5432/${RESERVATIONS_DB_NAME}
+      AUTH_SERVICE_URL: http://auth_cluster:8000
+      NOTIFICATIONS_SERVICE_URL: http://notifications-service:8004
+      PORT: 8002
+    depends_on:
+      - reservations-db
+    networks:
+      - app-network
+
+  documents-service:
+    build: ./services/documents-service
+    container_name: documents-service
+    restart: unless-stopped
+    <<: *security
+    environment:
+      DATABASE_URL: postgresql://${DOCUMENTS_DB_USER}:${DOCUMENTS_DB_PASSWORD}@documents-db:5432/${DOCUMENTS_DB_NAME}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: documents
+      AUTH_SERVICE_URL: http://auth_cluster:8000
+      PORT: 8003
+    depends_on:
+      - documents-db
+      - minio
+    networks:
+      - app-network
+
+  notifications-service:
+    build: ./services/notificacion-service
+    container_name: notifications-service
+    restart: on-failure
+    <<: *security
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
+      PORT: 8004
+    depends_on:
+      - redis
+    networks:
+      - app-network
+
+  datos-municipalidad-service:
+    build: ./services/datos-municipalidad-service
+    container_name: datos-municipalidad-service
+    restart: on-failure
+    <<: *security
+    environment:
+      DATABASE_URL: postgresql://${DOCUMENTS_DB_USER}:${DOCUMENTS_DB_PASSWORD}@documents-db:5432/${DOCUMENTS_DB_NAME}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      AUTH_SERVICE_URL: http://auth_cluster:8000
+      PORT: 8006
+    depends_on:
+      - documents-db
+      - minio
+    networks:
+      - app-network
+
+  # =============================================================================
+  # FRONTEND & GATEWAY
+  # =============================================================================
+
+  frontend:
+    build: ./services/frontend
+    container_name: frontend
+    restart: unless-stopped
+    <<: *security
+    ports:
+      - "${FRONTEND_PORT}:3000"
+      - "443:443"
+    volumes:
+      - ./infrastructure/certs:/etc/nginx/certs:ro
+    networks:
+      - app-network
+
+  api-gateway:
+    build: ./services/api-gateway
+    container_name: api-gateway
+    restart: unless-stopped
+    <<: *security
+    ports:
+      - "${GATEWAY_PORT}:80"
+      - "8443:443"
+    volumes:
+      - ./infrastructure/certs:/etc/nginx/certs:ro
+    depends_on:
+      - auth-service-1
+      - auth-service-2
+      - reservations-service-1
+      - reservations-service-2
+      - documents-service
+      - notifications-service
+      - datos-municipalidad-service
+      - frontend
+    networks:
+      - app-network
+
+volumes:
+  auth_db_data:
+  reservations_db_data:
+  documents_db_data:
+  redis_data:
+  minio_data:
+
+networks:
+  app-network:
+    driver: bridge

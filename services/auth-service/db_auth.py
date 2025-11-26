@@ -156,19 +156,26 @@ def authenticate_user(session: Session, identifier: str, password: str) -> User 
 
 def init_default_users(session: Session):
     """Inicializa usuarios por defecto si no existen."""
-    # Verificar si ya existe el usuario admin
-    admin_user = get_user_by_email(session, "admin@municipalidad.cl")
-    if not admin_user:
+    # Verificar si ya existe el usuario admin por email O por RUT
+    admin_email = "admin@municipalidad.cl"
+    admin_rut = "11111111-1"
+    
+    user_by_email = get_user_by_email(session, admin_email)
+    user_by_rut = get_user_by_rut(session, admin_rut)
+    
+    if not user_by_email and not user_by_rut:
         create_user(
             session, 
-            username="admin@municipalidad.cl",
-            email="admin@municipalidad.cl", 
+            username=admin_email,
+            email=admin_email, 
             nombre="Administrador Municipal",
             password="admin123",
-            rut="11111111-1",
+            rut=admin_rut,
             role="admin"
         )
-        print("✅ Usuario admin creado: admin@municipalidad.cl / admin123")
+        print(f"✅ Usuario admin creado: {admin_email} / admin123")
+    else:
+        print(f"ℹ️ Usuario admin ya existe (Email: {admin_email}, RUT: {admin_rut})")
 
 # =============================================================================
 # FUNCIONES PARA DATOS MUNICIPALES

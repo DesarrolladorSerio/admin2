@@ -1,38 +1,61 @@
+# ======== Stage 1: Builder ========
+FROM python:3.11.9-slim AS builder
+
+WORKDIR /app
+
+# Install build dependencies if needed
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install dependencies to user directory
+COPY requirements.txt .
+RUN pip install --upgrade setuptools && pip install --user --no-cache-dir -r requirements.txt
+
+# ======== Stage 2: Runtime ========
 FROM python:3.11.9-slim
+
+# Update OS and system python packages
+RUN apt-get update && apt-get upgrade -y && \
+    pip install --upgrade pip setuptools && \
+    rm -rf /var/lib/apt/lists/*
 
 LABEL maintainer="Augusto Fuenzalida <augusto@utalca.cl>" \
   version="1.0" \
   description="Microservicio FastAPI - auth-service"
 
-# Configurar variables de entorno para optimizar memoria
+# Security: Run vulnerability scan with: trivy image <image-name>
+
+# Configure environment variables
 ENV PYTHONUNBUFFERED=1 \
   PYTHONDONTWRITEBYTECODE=1 \
   PIP_NO_CACHE_DIR=1 \
   PIP_DISABLE_PIP_VERSION_CHECK=1 \
-  MALLOC_ARENA_MAX=2
+  MALLOC_ARENA_MAX=2 \
+  PATH=/home/appuser/.local/bin:$PATH
 
 WORKDIR /app
 
-# Copiar requirements e instalar dependencias con reintentos
-COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip --timeout 300 --retries 3 \
-  && (pip install --no-cache-dir -r requirements.txt --timeout 300 --retries 3 || \
-      (echo "Retrying pip install with different settings..." && \
-       pip install --no-cache-dir -r requirements.txt --timeout 600 --retries 5 --trusted-host pypi.org --trusted-host files.pythonhosted.org)) \
-  && find /usr/local -type d -name '__pycache__' -exec rm -rf {} + \
-  && find /usr/local -type f -name '*.pyc' -delete
-
-# instalar herramientas necesarias para healthcheck (curl)
+# Install runtime dependencies (curl for healthcheck)
 RUN apt-get update \
+  && apt-get upgrade -y \
   && apt-get install -y --no-install-recommends curl \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Copiar aplicación
+# Create non-privileged user
+RUN useradd --system --no-create-home appuser
+
+# Copy dependencies from builder
+COPY --from=builder /root/.local /home/appuser/.local
+
+# Copy application code
 COPY . .
 
-# Crear usuario no-root y ajustar permisos
-RUN useradd --system --no-create-home appuser && chown -R appuser /app
+# Change ownership
+RUN chown -R appuser /app
+
+# Switch to non-privileged user
 USER appuser
 
 ENV PORT=8000
@@ -41,5 +64,5 @@ EXPOSE ${PORT}
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=5 \
   CMD ["sh", "-c", "curl -f http://localhost:${PORT}/health || exit 1"]
 
-# Usar shell para permitir expansión de ${PORT} con optimizaciones
+# Use shell to allow expansion of ${PORT}
 CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT} --workers 1 --loop asyncio"]
