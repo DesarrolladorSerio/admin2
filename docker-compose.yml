@@ -35,6 +35,12 @@ x-security-db: &security-db
       max-size: "10m"
       max-file: "5"
 
+secrets:
+  db_password:
+    file: ./infrastructure/secrets/db_password.txt
+  app_user_password:
+    file: ./infrastructure/secrets/app_user_password.txt
+
 services:
   # =============================================================================
   # DATABASES
@@ -45,63 +51,73 @@ services:
     container_name: auth-db
     restart: unless-stopped
     <<: *security-db
+    secrets:
+      - db_password
     environment:
       POSTGRES_USER: ${AUTH_DB_USER}
-      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
       POSTGRES_DB: ${AUTH_DB_NAME}
-    ports:
-      - "${AUTH_DB_PORT}:5432"
+    command: postgres -c 'config_file=/etc/postgresql/postgresql.conf' -c 'hba_file=/etc/postgresql/pg_hba.conf'
     volumes:
       - auth_db_data:/var/lib/postgresql/data
       - ./infrastructure/postgres/auth-init:/docker-entrypoint-initdb.d
+      - ./infrastructure/database/init/01-app-permissions.sql:/docker-entrypoint-initdb.d/01-app-permissions.sql
+      - ./infrastructure/database/postgres/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./infrastructure/database/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf
     networks:
-      - app-network
+      - backend-network
 
   reservations-db:
     build: ./infrastructure/database/postgres-custom
     container_name: reservations-db
     restart: unless-stopped
     <<: *security-db
+    secrets:
+      - db_password
     environment:
       POSTGRES_USER: ${RESERVATIONS_DB_USER}
-      POSTGRES_PASSWORD: ${RESERVATIONS_DB_PASSWORD}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
       POSTGRES_DB: ${RESERVATIONS_DB_NAME}
-    ports:
-      - "${RESERVATIONS_DB_PORT}:5432"
+    command: postgres -c 'config_file=/etc/postgresql/postgresql.conf' -c 'hba_file=/etc/postgresql/pg_hba.conf'
     volumes:
       - reservations_db_data:/var/lib/postgresql/data
       - ./infrastructure/postgres/reservations-init:/docker-entrypoint-initdb.d
+      - ./infrastructure/database/init/01-app-permissions.sql:/docker-entrypoint-initdb.d/01-app-permissions.sql
+      - ./infrastructure/database/postgres/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./infrastructure/database/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf
     networks:
-      - app-network
+      - backend-network
 
   documents-db:
     build: ./infrastructure/database/postgres-custom
     container_name: documents-db
     restart: unless-stopped
     <<: *security-db
+    secrets:
+      - db_password
     environment:
       POSTGRES_USER: ${DOCUMENTS_DB_USER}
-      POSTGRES_PASSWORD: ${DOCUMENTS_DB_PASSWORD}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
       POSTGRES_DB: ${DOCUMENTS_DB_NAME}
-    ports:
-      - "${DOCUMENTS_DB_PORT}:5432"
+    command: postgres -c 'config_file=/etc/postgresql/postgresql.conf' -c 'hba_file=/etc/postgresql/pg_hba.conf'
     volumes:
       - documents_db_data:/var/lib/postgresql/data
       - ./infrastructure/postgres/documents-init:/docker-entrypoint-initdb.d
+      - ./infrastructure/database/init/01-app-permissions.sql:/docker-entrypoint-initdb.d/01-app-permissions.sql
+      - ./infrastructure/database/postgres/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./infrastructure/database/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf
     networks:
-      - app-network
+      - backend-network
 
   redis:
     build: ./infrastructure/database/redis-custom
     container_name: redis
     restart: unless-stopped
     <<: *security-db
-    ports:
-      - "${REDIS_PORT}:6379"
     volumes:
       - redis_data:/data
     networks:
-      - app-network
+      - backend-network
 
   minio:
     build: ./infrastructure/database/minio-custom
@@ -129,8 +145,10 @@ services:
     container_name: auth-service-1
     restart: unless-stopped
     <<: *security
+    secrets:
+      - app_user_password
     environment:
-      DATABASE_URL: postgresql://${AUTH_DB_USER}:${AUTH_DB_PASSWORD}@auth-db:5432/${AUTH_DB_NAME}
+      DATABASE_URL: postgresql://app_user:AppUserPass456!Secure@auth-db:5432/${AUTH_DB_NAME}
       SECRET_KEY: ${SECRET_KEY}
       ALGORITHM: ${ALGORITHM}
       PORT: 8000
@@ -138,14 +156,17 @@ services:
       - auth-db
     networks:
       - app-network
+      - backend-network
 
   auth-service-2:
     build: ./services/auth-service
     container_name: auth-service-2
     restart: unless-stopped
     <<: *security
+    secrets:
+      - app_user_password
     environment:
-      DATABASE_URL: postgresql://${AUTH_DB_USER}:${AUTH_DB_PASSWORD}@auth-db:5432/${AUTH_DB_NAME}
+      DATABASE_URL: postgresql://app_user:AppUserPass456!Secure@auth-db:5432/${AUTH_DB_NAME}
       SECRET_KEY: ${SECRET_KEY}
       ALGORITHM: ${ALGORITHM}
       PORT: 8000
@@ -153,14 +174,17 @@ services:
       - auth-db
     networks:
       - app-network
+      - backend-network
 
   reservations-service-1:
     build: ./services/reservations-service
     container_name: reservations-service-1
     restart: unless-stopped
     <<: *security
+    secrets:
+      - app_user_password
     environment:
-      DATABASE_URL: postgresql://${RESERVATIONS_DB_USER}:${RESERVATIONS_DB_PASSWORD}@reservations-db:5432/${RESERVATIONS_DB_NAME}
+      DATABASE_URL: postgresql://app_user:AppUserPass456!Secure@reservations-db:5432/${RESERVATIONS_DB_NAME}
       AUTH_SERVICE_URL: http://auth_cluster:8000
       NOTIFICATIONS_SERVICE_URL: http://notifications-service:8004
       PORT: 8002
@@ -168,14 +192,17 @@ services:
       - reservations-db
     networks:
       - app-network
+      - backend-network
 
   reservations-service-2:
     build: ./services/reservations-service
     container_name: reservations-service-2
     restart: unless-stopped
     <<: *security
+    secrets:
+      - app_user_password
     environment:
-      DATABASE_URL: postgresql://${RESERVATIONS_DB_USER}:${RESERVATIONS_DB_PASSWORD}@reservations-db:5432/${RESERVATIONS_DB_NAME}
+      DATABASE_URL: postgresql://app_user:AppUserPass456!Secure@reservations-db:5432/${RESERVATIONS_DB_NAME}
       AUTH_SERVICE_URL: http://auth_cluster:8000
       NOTIFICATIONS_SERVICE_URL: http://notifications-service:8004
       PORT: 8002
@@ -183,14 +210,17 @@ services:
       - reservations-db
     networks:
       - app-network
+      - backend-network
 
   documents-service:
     build: ./services/documents-service
     container_name: documents-service
     restart: unless-stopped
     <<: *security
+    secrets:
+      - app_user_password
     environment:
-      DATABASE_URL: postgresql://${DOCUMENTS_DB_USER}:${DOCUMENTS_DB_PASSWORD}@documents-db:5432/${DOCUMENTS_DB_NAME}
+      DATABASE_URL: postgresql://app_user:AppUserPass456!Secure@documents-db:5432/${DOCUMENTS_DB_NAME}
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
@@ -202,6 +232,7 @@ services:
       - minio
     networks:
       - app-network
+      - backend-network
 
   notifications-service:
     build: ./services/notificacion-service
@@ -221,14 +252,17 @@ services:
       - redis
     networks:
       - app-network
+      - backend-network
 
   datos-municipalidad-service:
     build: ./services/datos-municipalidad-service
     container_name: datos-municipalidad-service
     restart: on-failure
     <<: *security
+    secrets:
+      - app_user_password
     environment:
-      DATABASE_URL: postgresql://${DOCUMENTS_DB_USER}:${DOCUMENTS_DB_PASSWORD}@documents-db:5432/${DOCUMENTS_DB_NAME}
+      DATABASE_URL: postgresql://app_user:AppUserPass456!Secure@documents-db:5432/${DOCUMENTS_DB_NAME}
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
@@ -239,6 +273,7 @@ services:
       - minio
     networks:
       - app-network
+      - backend-network
 
   # =============================================================================
   # FRONTEND & GATEWAY
@@ -289,3 +324,6 @@ volumes:
 networks:
   app-network:
     driver: bridge
+  backend-network:
+    driver: bridge
+    internal: true
