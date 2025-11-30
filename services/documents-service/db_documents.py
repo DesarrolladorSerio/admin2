@@ -5,7 +5,21 @@ from typing import Optional
 from sqlmodel import Field, Session, SQLModel, create_engine, select, col, func
 
 # Configuración de base de datos
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg://documents_user:documents_password_2024@localhost:5435/documents_db")
+def get_db_url():
+    password_file = os.getenv("DATABASE_URL_FILE")
+    if password_file and os.path.exists(password_file):
+        with open(password_file, "r") as f:
+            password = f.read().strip()
+    else:
+        return os.getenv("DATABASE_URL", "postgresql+psycopg://documents_user:documents_password_2024@localhost:5435/documents_db")
+
+    host = os.getenv("DB_HOST", "documents-db")
+    db_name = os.getenv("DB_NAME", "documents_db")
+    user = os.getenv("DB_USER", "app_user")
+    
+    return f"postgresql+psycopg://{user}:{password}@{host}:5432/{db_name}"
+
+DATABASE_URL = get_db_url()
 
 engine = create_engine(DATABASE_URL, echo=True)
 

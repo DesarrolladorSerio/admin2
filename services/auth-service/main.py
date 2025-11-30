@@ -1,7 +1,10 @@
 import logging
+import os
+import time
 from datetime import datetime, timedelta
 
 import httpx
+from sqlalchemy.exc import OperationalError
 from auth_utils import UserRole, require_role
 
 # Importar funciones de base de datos
@@ -31,7 +34,14 @@ logger = logging.getLogger(__name__)
 # CONFIGURACIÓN
 # =============================================================================
 
-SECRET_KEY = "un-secreto-muy-fuerte-y-largo"
+def get_secret_key():
+    secret_file = os.getenv("SECRET_KEY_FILE")
+    if secret_file and os.path.exists(secret_file):
+        with open(secret_file, "r") as f:
+            return f.read().strip()
+    return os.getenv("SECRET_KEY", "un-secreto-muy-fuerte-y-largo")
+
+SECRET_KEY = get_secret_key()
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
@@ -138,11 +148,27 @@ def get_current_user(
 @app.on_event("startup")
 def on_startup():
     """Inicializa la base de datos al arrancar la aplicación."""
-    create_db_and_tables()
+    max_retries = 30
+    retry_interval = 2
     
-    # Crear usuarios por defecto
-    with next(get_session()) as session:
-        init_default_users(session)
+    for i in range(max_retries):
+        try:
+            create_db_and_tables()
+            
+            # Crear usuarios por defecto
+            with next(get_session()) as session:
+                init_default_users(session)
+            
+            logger.info("Database initialized and default users created successfully.")
+            break
+        except Exception as e:
+            if i < max_retries - 1:
+                logger.warning(f"Database connection failed, retrying in {retry_interval} seconds... (Attempt {i+1}/{max_retries})")
+                logger.warning(f"Error: {e}")
+                time.sleep(retry_interval)
+            else:
+                logger.error("Could not connect to the database after multiple retries.")
+                raise e
 
 # =============================================================================
 # FUNCIONES AUXILIARES PARA NOTIFICACIONES

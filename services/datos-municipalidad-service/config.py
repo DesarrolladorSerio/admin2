@@ -1,15 +1,35 @@
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 from typing import List
 import os
 
+def get_secret(secret_name, default=None):
+    file_env = f"{secret_name.upper()}_FILE"
+    file_path = os.getenv(file_env)
+    if file_path and os.path.exists(file_path):
+        with open(file_path, "r") as f:
+            return f.read().strip()
+    return os.getenv(secret_name.upper(), default)
+
+def get_db_url():
+    password_file = os.getenv("DATABASE_URL_FILE")
+    if password_file and os.path.exists(password_file):
+        with open(password_file, "r") as f:
+            password = f.read().strip()
+        host = os.getenv("DB_HOST", "documents-db")
+        db_name = os.getenv("DB_NAME", "documents")
+        user = os.getenv("DB_USER", "app_user")
+        return f"postgresql://{user}:{password}@{host}:5432/{db_name}"
+    
+    return os.getenv("DATABASE_URL", "postgresql://postgres:password@documents-db:5432/documents")
+
 class Settings(BaseSettings):
     # Base de datos
-    database_url: str = "postgresql://postgres:password@documents-db:5432/documents"
+    database_url: str = get_db_url()
     
     # MinIO
     minio_endpoint: str = "minio:9000"
-    minio_access_key: str = "minioadmin"
-    minio_secret_key: str = "minioadmin"
+    minio_access_key: str = get_secret("minio_access_key", "minioadmin")
+    minio_secret_key: str = get_secret("minio_secret_key", "minioadmin")
     minio_secure: bool = False
     minio_bucket: str = "documents"
     

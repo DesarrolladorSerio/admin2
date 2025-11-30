@@ -2,6 +2,8 @@
 # General
 # ================================================
 .env
+infrastructure/secrets/*
+!infrastructure/secrets/.gitkeep
 *.log
 *.tmp
 *.swp

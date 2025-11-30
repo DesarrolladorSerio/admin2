@@ -8,7 +8,22 @@ from sqlmodel import Field, Session, SQLModel, create_engine, select
 # CONFIGURACIÓN DE BASE DE DATOS
 # =============================================================================
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://admin:admin@db:5432/proyecto_db")
+def get_db_url():
+    password_file = os.getenv("DATABASE_URL_FILE")
+    if password_file and os.path.exists(password_file):
+        with open(password_file, "r") as f:
+            password = f.read().strip()
+    else:
+        # Fallback para desarrollo local sin secretos
+        return os.getenv("DATABASE_URL", "postgresql://admin:admin@db:5432/proyecto_db")
+
+    host = os.getenv("DB_HOST", "auth-db")
+    db_name = os.getenv("DB_NAME", "auth_db")
+    user = os.getenv("DB_USER", "app_user")
+    
+    return f"postgresql://{user}:{password}@{host}:5432/{db_name}"
+
+DATABASE_URL = get_db_url()
 engine = create_engine(DATABASE_URL) #funcion model slq . coneccion logica y monotr 
 #ahora traducimos lenguaje postgresql a python 
 
@@ -169,11 +184,11 @@ def init_default_users(session: Session):
             username=admin_email,
             email=admin_email, 
             nombre="Administrador Municipal",
-            password="admin123",
+            password=os.getenv("INITIAL_ADMIN_PASSWORD", "admin123_change_me"),
             rut=admin_rut,
             role="admin"
         )
-        print(f"✅ Usuario admin creado: {admin_email} / admin123")
+        print(f"✅ Usuario admin creado: {admin_email}")
     else:
         print(f"ℹ️ Usuario admin ya existe (Email: {admin_email}, RUT: {admin_rut})")
 

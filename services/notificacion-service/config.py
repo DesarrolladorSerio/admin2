@@ -3,6 +3,13 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+def get_secret(secret_name, default=None):
+    file_env = f"{secret_name}_FILE"
+    file_path = os.getenv(file_env)
+    if file_path and os.path.exists(file_path):
+        with open(file_path, "r") as f:
+            return f.read().strip()
+    return os.getenv(secret_name, default)
 
 class Settings(BaseModel):
     """Configuración del servicio de notificaciones"""
@@ -16,7 +23,7 @@ class Settings(BaseModel):
     SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
     SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
     SMTP_USER: str = os.getenv("SMTP_USER", "")
-    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_PASSWORD: str = get_secret("SMTP_PASSWORD", "")
     SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "")
     SMTP_FROM_NAME: str = os.getenv("SMTP_FROM_NAME", "Sistema de Reservas")
     SMTP_TLS: bool = os.getenv("SMTP_TLS", "True").lower() == "true"

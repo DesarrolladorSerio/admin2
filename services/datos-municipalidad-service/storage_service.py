@@ -8,6 +8,7 @@ from typing import Optional, BinaryIO
 import magic
 import hashlib
 import json
+from config import settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -15,12 +16,12 @@ logger = logging.getLogger(__name__)
 class MinIOStorage:
     def __init__(self):
         self.client = Minio(
-            os.getenv('MINIO_ENDPOINT', 'localhost:9000'),
-            access_key=os.getenv('MINIO_ACCESS_KEY', 'minioadmin'),
-            secret_key=os.getenv('MINIO_SECRET_KEY', 'minioadmin'),
-            secure=os.getenv('MINIO_SECURE', 'false').lower() == 'true'
+            settings.minio_endpoint,
+            access_key=settings.minio_access_key,
+            secret_key=settings.minio_secret_key,
+            secure=settings.minio_secure
         )
-        self.bucket_name = os.getenv('MINIO_BUCKET', 'documents')
+        self.bucket_name = settings.minio_bucket
         self.init_bucket()
     
     def init_bucket(self):

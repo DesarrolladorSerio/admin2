@@ -40,6 +40,14 @@ secrets:
     file: ./infrastructure/secrets/db_password.txt
   app_user_password:
     file: ./infrastructure/secrets/app_user_password.txt
+  jwt_secret:
+    file: ./infrastructure/secrets/jwt_secret.txt
+  minio_access_key:
+    file: ./infrastructure/secrets/minio_access_key.txt
+  minio_secret_key:
+    file: ./infrastructure/secrets/minio_secret_key.txt
+  smtp_password:
+    file: ./infrastructure/secrets/smtp_password.txt
 
 services:
   # =============================================================================
@@ -53,6 +61,7 @@ services:
     <<: *security-db
     secrets:
       - db_password
+      - app_user_password
     environment:
       POSTGRES_USER: ${AUTH_DB_USER}
       POSTGRES_PASSWORD_FILE: /run/secrets/db_password
@@ -61,7 +70,7 @@ services:
     volumes:
       - auth_db_data:/var/lib/postgresql/data
       - ./infrastructure/postgres/auth-init:/docker-entrypoint-initdb.d
-      - ./infrastructure/database/init/01-app-permissions.sql:/docker-entrypoint-initdb.d/01-app-permissions.sql
+      - ./infrastructure/database/init/01-app-permissions.sh:/docker-entrypoint-initdb.d/01-app-permissions.sh
       - ./infrastructure/database/postgres/postgresql.conf:/etc/postgresql/postgresql.conf
       - ./infrastructure/database/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf
     networks:
@@ -74,6 +83,7 @@ services:
     <<: *security-db
     secrets:
       - db_password
+      - app_user_password
     environment:
       POSTGRES_USER: ${RESERVATIONS_DB_USER}
       POSTGRES_PASSWORD_FILE: /run/secrets/db_password
@@ -82,7 +92,7 @@ services:
     volumes:
       - reservations_db_data:/var/lib/postgresql/data
       - ./infrastructure/postgres/reservations-init:/docker-entrypoint-initdb.d
-      - ./infrastructure/database/init/01-app-permissions.sql:/docker-entrypoint-initdb.d/01-app-permissions.sql
+      - ./infrastructure/database/init/01-app-permissions.sh:/docker-entrypoint-initdb.d/01-app-permissions.sh
       - ./infrastructure/database/postgres/postgresql.conf:/etc/postgresql/postgresql.conf
       - ./infrastructure/database/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf
     networks:
@@ -95,6 +105,7 @@ services:
     <<: *security-db
     secrets:
       - db_password
+      - app_user_password
     environment:
       POSTGRES_USER: ${DOCUMENTS_DB_USER}
       POSTGRES_PASSWORD_FILE: /run/secrets/db_password
@@ -103,7 +114,7 @@ services:
     volumes:
       - documents_db_data:/var/lib/postgresql/data
       - ./infrastructure/postgres/documents-init:/docker-entrypoint-initdb.d
-      - ./infrastructure/database/init/01-app-permissions.sql:/docker-entrypoint-initdb.d/01-app-permissions.sql
+      - ./infrastructure/database/init/01-app-permissions.sh:/docker-entrypoint-initdb.d/01-app-permissions.sh
       - ./infrastructure/database/postgres/postgresql.conf:/etc/postgresql/postgresql.conf
       - ./infrastructure/database/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf
     networks:
@@ -125,9 +136,12 @@ services:
     restart: unless-stopped
     <<: *security-db
     command: server /data --console-address ":9001"
+    secrets:
+      - minio_access_key
+      - minio_secret_key
     environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+      MINIO_ROOT_USER_FILE: /run/secrets/minio_access_key
+      MINIO_ROOT_PASSWORD_FILE: /run/secrets/minio_secret_key
     ports:
       - "${MINIO_PORT}:9000"
       - "${MINIO_CONSOLE_PORT}:9001"
@@ -147,9 +161,12 @@ services:
     <<: *security
     secrets:
       - app_user_password
+      - jwt_secret
     environment:
-      DATABASE_URL: postgresql://app_user:AppUserPass456!Secure@auth-db:5432/${AUTH_DB_NAME}
-      SECRET_KEY: ${SECRET_KEY}
+      DATABASE_URL_FILE: /run/secrets/app_user_password
+      DB_HOST: auth-db
+      DB_NAME: ${AUTH_DB_NAME}
+      SECRET_KEY_FILE: /run/secrets/jwt_secret
       ALGORITHM: ${ALGORITHM}
       PORT: 8000
     depends_on:
@@ -165,9 +182,12 @@ services:
     <<: *security
     secrets:
       - app_user_password
+      - jwt_secret
     environment:
-      DATABASE_URL: postgresql://app_user:AppUserPass456!Secure@auth-db:5432/${AUTH_DB_NAME}
-      SECRET_KEY: ${SECRET_KEY}
+      DATABASE_URL_FILE: /run/secrets/app_user_password
+      DB_HOST: auth-db
+      DB_NAME: ${AUTH_DB_NAME}
+      SECRET_KEY_FILE: /run/secrets/jwt_secret
       ALGORITHM: ${ALGORITHM}
       PORT: 8000
     depends_on:
@@ -184,7 +204,9 @@ services:
     secrets:
       - app_user_password
     environment:
-      DATABASE_URL: postgresql://app_user:AppUserPass456!Secure@reservations-db:5432/${RESERVATIONS_DB_NAME}
+      DATABASE_URL_FILE: /run/secrets/app_user_password
+      DB_HOST: reservations-db
+      DB_NAME: ${RESERVATIONS_DB_NAME}
       AUTH_SERVICE_URL: http://auth_cluster:8000
       NOTIFICATIONS_SERVICE_URL: http://notifications-service:8004
       PORT: 8002
@@ -202,7 +224,9 @@ services:
     secrets:
       - app_user_password
     environment:
-      DATABASE_URL: postgresql://app_user:AppUserPass456!Secure@reservations-db:5432/${RESERVATIONS_DB_NAME}
+      DATABASE_URL_FILE: /run/secrets/app_user_password
+      DB_HOST: reservations-db
+      DB_NAME: ${RESERVATIONS_DB_NAME}
       AUTH_SERVICE_URL: http://auth_cluster:8000
       NOTIFICATIONS_SERVICE_URL: http://notifications-service:8004
       PORT: 8002
@@ -219,11 +243,15 @@ services:
     <<: *security
     secrets:
       - app_user_password
+      - minio_access_key
+      - minio_secret_key
     environment:
-      DATABASE_URL: postgresql://app_user:AppUserPass456!Secure@documents-db:5432/${DOCUMENTS_DB_NAME}
+      DATABASE_URL_FILE: /run/secrets/app_user_password
+      DB_HOST: documents-db
+      DB_NAME: ${DOCUMENTS_DB_NAME}
       MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_ACCESS_KEY_FILE: /run/secrets/minio_access_key
+      MINIO_SECRET_KEY_FILE: /run/secrets/minio_secret_key
       MINIO_BUCKET: documents
       AUTH_SERVICE_URL: http://auth_cluster:8000
       PORT: 8003
@@ -239,13 +267,15 @@ services:
     container_name: notifications-service
     restart: on-failure
     <<: *security
+    secrets:
+      - smtp_password
     environment:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
       SMTP_USERNAME: ${SMTP_USERNAME}
-      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_PASSWORD_FILE: /run/secrets/smtp_password
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
       PORT: 8004
     depends_on:
@@ -261,11 +291,15 @@ services:
     <<: *security
     secrets:
       - app_user_password
+      - minio_access_key
+      - minio_secret_key
     environment:
-      DATABASE_URL: postgresql://app_user:AppUserPass456!Secure@documents-db:5432/${DOCUMENTS_DB_NAME}
+      DATABASE_URL_FILE: /run/secrets/app_user_password
+      DB_HOST: documents-db
+      DB_NAME: ${DOCUMENTS_DB_NAME}
       MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_ACCESS_KEY_FILE: /run/secrets/minio_access_key
+      MINIO_SECRET_KEY_FILE: /run/secrets/minio_secret_key
       AUTH_SERVICE_URL: http://auth_cluster:8000
       PORT: 8006
     depends_on:
