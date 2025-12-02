@@ -331,6 +331,8 @@ services:
     container_name: api-gateway
     restart: unless-stopped
     <<: *security
+    # Aumentar memoria compartida para zonas de rate-limit
+    shm_size: '128m'
     ports:
       - "${GATEWAY_PORT}:80"
       - "8443:443"

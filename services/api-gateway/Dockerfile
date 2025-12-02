@@ -17,10 +17,11 @@ RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf && \
      sed -i 's/dl-cdn.alpinelinux.org/alpine.global.ssl.fastly.net/g' /etc/apk/repositories && \
      apk update && apk upgrade --no-cache && apk add --no-cache wget curl)
 
-# Crear y ajustar permisos para directorios usados por Nginx
+# Crear y dar permisos a directorios usados por Nginx
 RUN mkdir -p /var/cache/nginx /var/run /var/log/nginx && \
     touch /var/run/nginx.pid && \
-    chown -R nginx:nginx /var/cache/nginx /var/run /var/log/nginx /var/run/nginx.pid
+    chown -R nginx:nginx /var/cache/nginx /var/run /var/log/nginx /var/run/nginx.pid && \
+    ln -sf /dev/stderr /var/log/nginx/security.log
 
 # Copiar configuración personalizada
 COPY nginx.conf /etc/nginx/nginx.conf
